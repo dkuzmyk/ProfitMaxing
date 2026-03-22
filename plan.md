@@ -23,6 +23,35 @@ The app should cover the features traders expect from professional journaling to
 - notes, screenshots, and post-trade review
 - filtering by symbol, setup, tag, date range, and account
 
+## Current Status
+
+Already implemented in the repo:
+
+- Next.js app scaffolded with `src/app`
+- Supabase SSR helper setup
+- root `proxy.ts` for auth session refresh
+- synthetic guest/demo dataset and guest pages
+- login page with email/password sign-in
+- protected real-user dashboard
+- first SQL migration for `public.trades`
+- manual real trade create / edit / delete
+- personal dashboard with timeframe-aware summary stats
+- cumulative P&L chart
+- compact timeframe picker
+- guest and personal navigation split
+
+Current split between fake and real data:
+
+- `/demo` routes use synthetic local data only
+- `/dashboard` is for authenticated real users
+- `public.trades` is the first real database table
+
+Immediate next build target:
+
+- turn setups, mistakes, and review data into first-class features
+- move dashboard calculations toward SQL-backed reporting
+- build a real journal table and analytics views optimized for filtering
+
 ## 2. Constraints We Should Design Around
 
 ### Hosting
@@ -290,6 +319,12 @@ Professional-feeling analytics should include:
 - win rate by tag
 - average hold time
 - largest winners / losers
+- realized return %
+- total traded capital
+- currently invested capital
+- P&L % by setup, symbol, and tag
+- MAE / MFE later
+- R-multiple and expectancy in R later
 
 ### E. Import
 
@@ -311,6 +346,37 @@ Include a space for:
 - examples of A+ trades
 
 This is a major difference between a basic trade log and a real journaling platform.
+
+### H. Mistake Detection
+
+This needs to be a core module, not an afterthought.
+
+Most useful features:
+
+- mistake tags on each trade
+- context tags on each trade
+- planned vs actual entry / stop / target
+- followed-plan boolean
+- confidence / grade / discipline score
+- best setup and worst mistake reports
+- filtering by setup + mistake + symbol + session + date range
+
+### I. Strategy Design
+
+The app should help answer:
+
+- which setups are actually profitable
+- under what conditions those setups work best
+- which repeated mistakes erase edge
+- what rules should be added to the playbook
+
+Most useful strategy tools:
+
+- setup-level performance cards
+- setup playbook pages with checklist and examples
+- tag-level and mistake-level performance tables
+- what-if filtering across timeframe, session, symbol, and setup
+- review screens that compare A+ trades against failed trades
 
 ### G. Guest Demo Mode
 
@@ -360,6 +426,35 @@ Recommended first-pass tables:
 10. `daily_journal_entries`
 11. `import_jobs`
 12. `import_rows`
+13. `mistakes`
+14. `trade_mistake_links`
+15. `playbook_rules`
+16. `trade_review_scores`
+
+### Suggested next schema changes
+
+Add first-class journaling fields to `trades`:
+
+- `account_id`
+- `setup_id`
+- `status`
+- `entry_value`
+- `exit_value`
+- `realized_pnl`
+- `realized_pnl_percent`
+- `holding_minutes`
+- `trade_date`
+- `session_bucket`
+- `day_of_week`
+- `followed_plan`
+- `confidence_rating`
+- `grade`
+
+Important note:
+
+- the current `trades` table is enough to move fast now
+- once we add more analytics, we should promote derived fields like `entry_value`, `realized_pnl`, and `holding_minutes` into generated or write-time maintained columns so dashboard pages are not recomputing everything in JavaScript
+- if Supabase generated columns are too restrictive for some fields, use SQL triggers to keep those denormalized fields updated on insert and update
 
 ### Demo data strategy
 
@@ -383,12 +478,31 @@ Recommended SQL views:
 - `v_setup_performance`
 - `v_symbol_performance`
 - `v_account_performance`
+- `v_mistake_performance`
+- `v_tag_performance`
+- `v_time_of_day_performance`
+- `v_day_of_week_performance`
+- `v_rule_adherence_performance`
 
 Reason:
 
 - dashboards can read from stable reporting views
 - business logic stays closer to the data
 - makes the frontend simpler
+
+### Index strategy
+
+To keep filtering fast as the journal grows, add indexes around the way traders actually query:
+
+- `(user_id, trade_date desc)`
+- `(user_id, opened_at desc)`
+- `(user_id, status, trade_date desc)`
+- `(user_id, setup_id, trade_date desc)`
+- `(user_id, symbol, trade_date desc)`
+- `(user_id, account_id, trade_date desc)`
+- junction-table indexes for tags and mistakes by `(user_id, trade_id)` and `(user_id, tag_id)` / `(user_id, mistake_id)`
+
+These matter more than adding more frontend optimization tricks.
 
 ## 8. Project Structure
 
@@ -397,92 +511,58 @@ Use a single Next.js app with `src/` layout.
 ```text
 /
   plan.md
+  AGENTS.md
   package.json
   tsconfig.json
   next.config.ts
   .env.example
+  proxy.ts
   public/
   supabase/
     migrations/
-    seed.sql
-    types.ts
+      20260321180000_create_trades.sql
   src/
     app/
-      (marketing)/
+      dashboard/
         page.tsx
-      (demo)/
-        demo/
-          page.tsx
-        demo/journal/
-          page.tsx
-        demo/trades/
-          [tradeId]/
-            page.tsx
-        demo/analytics/
-          page.tsx
-      (auth)/
-        login/
-        signup/
-      (dashboard)/
-        dashboard/
-          page.tsx
+      demo/
+        layout.tsx
+        page.tsx
         journal/
           page.tsx
         trades/
           [tradeId]/
             page.tsx
-        analytics/
-          page.tsx
-        import/
-          page.tsx
-        playbook/
-          page.tsx
-        settings/
-          page.tsx
-      api/
-        import/
-          route.ts
-        export/
-          route.ts
-    components/
-      ui/
-      charts/
-      forms/
-      tables/
-      layout/
-    features/
-      auth/
-      demo/
-      dashboard/
-      journal/
-      trades/
-      analytics/
-      import/
-      playbook/
-      settings/
+      login/
+        actions.ts
+        page.tsx
+      page.tsx
     lib/
+      demo-data.ts
       supabase/
         client.ts
+        config.ts
+        proxy.ts
         server.ts
-        middleware.ts
-      validation/
-      utils/
-      constants/
-      formatters/
-    server/
-      actions/
-      queries/
-      services/
-      analytics/
-      demo/
-    styles/
-      globals.css
-    types/
-  tests/
-    e2e/
-    integration/
-    unit/
 ```
+
+### Current implemented routes
+
+- `/`
+- `/login`
+- `/dashboard`
+- `/demo`
+- `/demo/journal`
+- `/demo/trades/[tradeId]`
+
+### Planned near-term additions
+
+- `/trades/new`
+- `/trades/[tradeId]/edit`
+- `/journal`
+- `/analytics`
+- `/playbook`
+- shared reusable components under `src/components`
 
 ## 9. Folder Responsibility Rules
 
@@ -495,39 +575,17 @@ To keep the codebase clean:
 - page composition
 - route-level loading/error states
 
-### `src/features`
-
-- feature-specific UI and logic
-- the main place for domain organization
-
-Examples:
-
-- trade entry form belongs in `features/trades`
-- analytics filter bar belongs in `features/analytics`
-
-### `src/components`
-
-- shared presentational building blocks
-- no business-specific assumptions unless they are truly cross-feature
-
-### `src/server`
-
-- all server-only logic
-- database reads/writes
-- analytics aggregation helpers
-- import parsing and normalization
-
-### `src/features/demo` and `src/server/demo`
-
-- keep guest/demo logic separate from real-user logic where practical
-- seed and query demo-specific datasets here
-- prevent accidental mixing of authenticated-user queries and guest queries
-
 ### `supabase/`
 
 - source of truth for schema migrations
-- seed data
-- generated DB types
+- first migration for `public.trades` already lives here
+- later: seed data and generated DB types
+
+### Current auth / data boundary
+
+- guest routes must read from synthetic local data only
+- authenticated routes must read from Supabase only
+- do not mix demo records into real-user queries
 
 ## 10. UI/UX Principles
 
@@ -591,6 +649,26 @@ For Vercel Hobby, we should be conservative:
 - use reporting views for charts
 - optimize uploaded screenshots before storage on the client when possible
 - keep large CSV parsing in a dedicated route handler
+- move expensive trade math out of React render paths and into SQL-backed reads as data grows
+- use server-side pagination and filtering for the journal grid
+- avoid re-reading the same dashboard data multiple times in one request
+- cache guest/demo data aggressively because it is synthetic and static
+- after mutations, invalidate only the affected dashboard and journal reads instead of forcing full reload patterns
+
+Recommended app-level caching pattern:
+
+- use React `cache()` for per-request deduping of repeated Supabase reads
+- use Next cache tags for analytics reads that can be invalidated after create/update/delete
+- call `revalidateTag` after trade mutations
+- keep user-specific authenticated pages dynamic, but cache the derived analytics payloads they consume when safe
+
+Recommended database performance pattern:
+
+- use SQL views for summary and chart reads
+- use write-time maintained derived columns for per-trade metrics
+- add targeted indexes before adding more client-side memoization
+- prefer one grouped aggregate query over many row-by-row calculations
+- keep guest/demo entirely in local static data so it has near-zero query cost
 
 Do not build v1 around:
 
@@ -616,6 +694,18 @@ Do not build v1 around:
 - dashboard stats
 - core charts
 - CSV import for at least one broker format
+- mistake tagging
+- playbook-linked setups
+- timeframe-aware analytics
+- performant SQL-backed summary reads
+
+### Items already done
+
+- guest/demo mode with seeded synthetic data
+- login page and protected dashboard shell
+- initial `trades` migration
+- manual trade create / edit / delete
+- timeframe-aware dashboard summary and cumulative chart
 
 ## V1.1
 
@@ -624,6 +714,9 @@ Do not build v1 around:
 - playbook module
 - weekly review screen
 - export to CSV
+- setup analytics
+- mistake analytics
+- screenshot upload and review workflow
 
 ## V1.2
 
@@ -632,18 +725,21 @@ Do not build v1 around:
 - calendar view
 - trade replay or annotation support
 - notification/reminder flows
+- materialized aggregates only if plain views become too slow
 
 ## 14. Suggested Build Order
 
-1. Bootstrap Next.js app, Tailwind, `shadcn/ui`, Supabase auth, route protection, and demo route group.
-2. Create database schema, demo seed strategy, and RLS policies.
-3. Build manual trade entry flow for authenticated users.
-4. Build journal table and trade detail page for both authenticated and demo reads.
-5. Build dashboard metrics and charts from SQL views.
-6. Add screenshot uploads for authenticated users only.
-7. Add CSV import pipeline.
-8. Add playbook and review tools.
-9. Add tests around real-user isolation and guest/demo access.
+1. Completed: bootstrap Next.js, Supabase helpers, route protection, and demo route group.
+2. Completed: create the first `trades` schema and RLS policies.
+3. Completed: build manual trade entry, edit, delete, and range-aware dashboard metrics.
+4. Next: add `setups`, `mistakes`, `trade_tag_links`, and trade-review schema.
+5. Next: add journal page with server-side filters and pagination.
+6. Next: move current dashboard summary math into SQL views or RPC-backed aggregate queries.
+7. Next: build setup performance, mistake performance, and tag performance analytics.
+8. Then: add screenshot uploads for authenticated users only.
+9. Then: add CSV import pipeline.
+10. Then: add playbook pages and review tools.
+11. Then: add tests around real-user isolation, guest/demo access, and analytics correctness.
 
 ## 15. Environment Variables
 
@@ -651,6 +747,7 @@ Expected `.env` keys:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (optional newer key format)
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `NEXT_PUBLIC_APP_URL`
 
@@ -679,7 +776,7 @@ It also fits a private multi-user hobby deployment for a small trusted group.
 
 After this plan, the next practical step is:
 
-1. scaffold the Next.js app
-2. wire Supabase auth
-3. create the first migration set for trades, executions, tags, notes, and accounts
-4. build the journal table and manual trade entry flow first
+1. expand the schema for setups, mistakes, tags, and review fields
+2. add server-side journal filters and a dedicated journal page
+3. move dashboard metrics into SQL-backed reporting reads
+4. build setup and mistake analytics before adding more cosmetic dashboard tiles
