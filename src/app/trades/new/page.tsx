@@ -20,6 +20,18 @@ export default async function NewTradePage({
     redirect("/login?message=Please sign in to create a trade.");
   }
 
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("is_verified")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile?.is_verified) {
+    redirect(
+      "/dashboard?message=Your account is not verified to insert journal data yet.",
+    );
+  }
+
   const { message, saved } = await searchParams;
 
   return (
@@ -37,15 +49,25 @@ export default async function NewTradePage({
               <p className="mt-3 max-w-2xl text-sm leading-7 text-[#b5bac1]">
                 Keep the form minimal: symbol, side, size, entry, and time.
                 Close details are optional so open trades do not slow you down.
+                Review fields stay tucked away until you want deeper setup and
+                mistake analysis.
               </p>
             </div>
 
-            <Link
-              href="/dashboard"
-              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-white/10"
-            >
-              Back to dashboard
-            </Link>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/journal"
+                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-white/10"
+              >
+                Open journal
+              </Link>
+              <Link
+                href="/dashboard"
+                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-white/10"
+              >
+                Back to dashboard
+              </Link>
+            </div>
           </div>
 
           {saved ? (

@@ -1,13 +1,55 @@
 import Link from "next/link";
 
-import { signIn } from "./actions";
+import { createClient } from "@/lib/supabase/server";
+
+import { signIn, signOut } from "./actions";
 
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ message?: string }>;
 }) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const { message } = await searchParams;
+
+  if (user) {
+    return (
+      <main className="px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-xl">
+          <section className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-8 shadow-[0_32px_80px_rgba(0,0,0,0.35)]">
+            <p className="text-sm font-medium uppercase tracking-[0.25em] text-[#949ba4]">
+              Personal Access
+            </p>
+            <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white">
+              You are already signed in
+            </h1>
+            <p className="mt-4 text-sm leading-7 text-[#b5bac1]">
+              Signed in as {user.email ?? "an authenticated user"}. Sign out if
+              you want to switch accounts.
+            </p>
+
+            {message ? (
+              <div className="mt-6 rounded-2xl border border-[#f0b232]/20 bg-[#f0b232]/10 px-4 py-3 text-sm text-[#f5c96a]">
+                {message}
+              </div>
+            ) : null}
+
+            <form action={signOut} className="mt-8">
+              <button
+                type="submit"
+                className="rounded-2xl bg-[#5865f2] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#4752c4]"
+              >
+                Sign out
+              </button>
+            </form>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="px-4 py-10 sm:px-6 lg:px-8">

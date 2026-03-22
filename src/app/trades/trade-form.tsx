@@ -52,6 +52,13 @@ type TradeFormProps = {
     exitPrice?: number | null;
     closedAt?: string | null;
     notes?: string | null;
+    thesis?: string | null;
+    lessons?: string | null;
+    tags?: string[] | null;
+    mistakeTags?: string[] | null;
+    followedPlan?: boolean | null;
+    confidenceRating?: number | null;
+    grade?: "A" | "B" | "C" | "D" | "F" | null;
   };
 };
 
@@ -66,6 +73,17 @@ export function TradeForm({
   const openedAtLocal = toLocalDateTimeValue(initialValues?.openedAt);
   const closedAtLocal = toLocalDateTimeValue(initialValues?.closedAt);
   const isClosed = Boolean(initialValues?.exitPrice && initialValues?.closedAt);
+  const tagsValue = initialValues?.tags?.join(", ") ?? "";
+  const mistakeTagsValue = initialValues?.mistakeTags?.join(", ") ?? "";
+  const hasReviewValues = Boolean(
+    initialValues?.thesis ||
+      initialValues?.lessons ||
+      initialValues?.tags?.length ||
+      initialValues?.mistakeTags?.length ||
+      initialValues?.followedPlan != null ||
+      initialValues?.confidenceRating ||
+      initialValues?.grade,
+  );
 
   return (
     <form
@@ -281,7 +299,7 @@ export function TradeForm({
                 id="closedAtLocal"
                 name="closedAtLocal"
                 type="datetime-local"
-                defaultValue={isClosed ? closedAtLocal : ""}
+                defaultValue={closedAtLocal}
                 className="mt-3 w-full rounded-2xl border border-white/10 bg-[#111214] px-4 py-3 text-sm text-white outline-none transition focus:border-[#5865f2]"
               />
             </div>
@@ -310,6 +328,162 @@ export function TradeForm({
           className="mt-3 w-full rounded-2xl border border-white/10 bg-[#111214] px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#6d7278] focus:border-[#5865f2]"
         />
       </section>
+
+      <details
+        className="rounded-[24px] border border-white/8 bg-[#1e1f22] p-5"
+        open={hasReviewValues}
+      >
+        <summary className="cursor-pointer list-none text-sm font-medium uppercase tracking-[0.18em] text-[#dbdee1]">
+          Review and setup detail
+        </summary>
+        <p className="mt-3 text-sm leading-7 text-[#949ba4]">
+          Optional fields for spotting strong setups, repeated mistakes, and
+          plan adherence.
+        </p>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+          <div className="rounded-[20px] border border-white/8 bg-[#111214] p-4">
+            <label
+              htmlFor="followedPlan"
+              className="text-xs font-medium uppercase tracking-[0.18em] text-[#949ba4]"
+            >
+              Followed Plan
+            </label>
+            <select
+              id="followedPlan"
+              name="followedPlan"
+              defaultValue={
+                initialValues?.followedPlan == null
+                  ? ""
+                  : initialValues.followedPlan
+                    ? "yes"
+                    : "no"
+              }
+              className="mt-3 w-full rounded-2xl border border-white/10 bg-[#1a1b1f] px-4 py-3 text-sm text-white outline-none transition focus:border-[#5865f2]"
+            >
+              <option value="">Not reviewed</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+
+          <div className="rounded-[20px] border border-white/8 bg-[#111214] p-4">
+            <label
+              htmlFor="confidenceRating"
+              className="text-xs font-medium uppercase tracking-[0.18em] text-[#949ba4]"
+            >
+              Confidence
+            </label>
+            <select
+              id="confidenceRating"
+              name="confidenceRating"
+              defaultValue={initialValues?.confidenceRating ?? ""}
+              className="mt-3 w-full rounded-2xl border border-white/10 bg-[#1a1b1f] px-4 py-3 text-sm text-white outline-none transition focus:border-[#5865f2]"
+            >
+              <option value="">Unrated</option>
+              <option value="1">1 - weak</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5 - strong</option>
+            </select>
+          </div>
+
+          <div className="rounded-[20px] border border-white/8 bg-[#111214] p-4">
+            <label
+              htmlFor="grade"
+              className="text-xs font-medium uppercase tracking-[0.18em] text-[#949ba4]"
+            >
+              Grade
+            </label>
+            <select
+              id="grade"
+              name="grade"
+              defaultValue={initialValues?.grade ?? ""}
+              className="mt-3 w-full rounded-2xl border border-white/10 bg-[#1a1b1f] px-4 py-3 text-sm text-white outline-none transition focus:border-[#5865f2]"
+            >
+              <option value="">Ungraded</option>
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+              <option value="D">D</option>
+              <option value="F">F</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div className="rounded-[20px] border border-white/8 bg-[#111214] p-4">
+            <label
+              htmlFor="tags"
+              className="text-xs font-medium uppercase tracking-[0.18em] text-[#949ba4]"
+            >
+              Tags
+            </label>
+            <input
+              id="tags"
+              name="tags"
+              type="text"
+              defaultValue={tagsValue}
+              placeholder="opening-bell, trend, high-volume"
+              className="mt-3 w-full rounded-2xl border border-white/10 bg-[#1a1b1f] px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#6d7278] focus:border-[#5865f2]"
+            />
+          </div>
+
+          <div className="rounded-[20px] border border-white/8 bg-[#111214] p-4">
+            <label
+              htmlFor="mistakeTags"
+              className="text-xs font-medium uppercase tracking-[0.18em] text-[#949ba4]"
+            >
+              Mistake Tags
+            </label>
+            <input
+              id="mistakeTags"
+              name="mistakeTags"
+              type="text"
+              defaultValue={mistakeTagsValue}
+              placeholder="late entry, oversized, cut winner early"
+              className="mt-3 w-full rounded-2xl border border-white/10 bg-[#1a1b1f] px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#6d7278] focus:border-[#5865f2]"
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div className="rounded-[20px] border border-white/8 bg-[#111214] p-4">
+            <label
+              htmlFor="thesis"
+              className="text-xs font-medium uppercase tracking-[0.18em] text-[#949ba4]"
+            >
+              Thesis
+            </label>
+            <textarea
+              id="thesis"
+              name="thesis"
+              rows={4}
+              defaultValue={initialValues?.thesis ?? ""}
+              placeholder="What made this setup valid?"
+              className="mt-3 w-full rounded-2xl border border-white/10 bg-[#1a1b1f] px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#6d7278] focus:border-[#5865f2]"
+            />
+          </div>
+
+          <div className="rounded-[20px] border border-white/8 bg-[#111214] p-4">
+            <label
+              htmlFor="lessons"
+              className="text-xs font-medium uppercase tracking-[0.18em] text-[#949ba4]"
+            >
+              Lessons
+            </label>
+            <textarea
+              id="lessons"
+              name="lessons"
+              rows={4}
+              defaultValue={initialValues?.lessons ?? ""}
+              placeholder="What should be repeated or avoided next time?"
+              className="mt-3 w-full rounded-2xl border border-white/10 bg-[#1a1b1f] px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#6d7278] focus:border-[#5865f2]"
+            />
+          </div>
+        </div>
+      </details>
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <button

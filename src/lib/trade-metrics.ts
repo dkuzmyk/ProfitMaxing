@@ -147,6 +147,36 @@ export function normalizeTradeRange(value: string | undefined): TradeRange {
     : "30d";
 }
 
+export function getTradeRangeCutoff(range: TradeRange) {
+  if (range === "all") {
+    return null;
+  }
+
+  const cutoff = new Date();
+
+  if (range === "ytd") {
+    cutoff.setMonth(0, 1);
+    cutoff.setHours(0, 0, 0, 0);
+    return cutoff;
+  }
+
+  if (range === "1d") {
+    cutoff.setDate(cutoff.getDate() - 1);
+  } else if (range === "7d") {
+    cutoff.setDate(cutoff.getDate() - 7);
+  } else if (range === "30d") {
+    cutoff.setDate(cutoff.getDate() - 30);
+  } else if (range === "90d") {
+    cutoff.setDate(cutoff.getDate() - 90);
+  } else if (range === "1y") {
+    cutoff.setFullYear(cutoff.getFullYear() - 1);
+  } else if (range === "5y") {
+    cutoff.setFullYear(cutoff.getFullYear() - 5);
+  }
+
+  return cutoff;
+}
+
 export function getTradeRangeLabel(range: TradeRange) {
   switch (range) {
     case "1d":
@@ -169,27 +199,10 @@ export function getTradeRangeLabel(range: TradeRange) {
 }
 
 export function filterTradesByRange(trades: StoredTrade[], range: TradeRange) {
-  if (range === "all") {
+  const cutoff = getTradeRangeCutoff(range);
+
+  if (!cutoff) {
     return trades;
-  }
-
-  const cutoff = new Date();
-
-  if (range === "ytd") {
-    cutoff.setMonth(0, 1);
-    cutoff.setHours(0, 0, 0, 0);
-  } else if (range === "1d") {
-    cutoff.setDate(cutoff.getDate() - 1);
-  } else if (range === "7d") {
-    cutoff.setDate(cutoff.getDate() - 7);
-  } else if (range === "30d") {
-    cutoff.setDate(cutoff.getDate() - 30);
-  } else if (range === "90d") {
-    cutoff.setDate(cutoff.getDate() - 90);
-  } else if (range === "1y") {
-    cutoff.setFullYear(cutoff.getFullYear() - 1);
-  } else if (range === "5y") {
-    cutoff.setFullYear(cutoff.getFullYear() - 5);
   }
 
   return trades.filter((trade) => {

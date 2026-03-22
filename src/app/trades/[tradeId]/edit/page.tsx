@@ -22,12 +22,24 @@ export default async function EditTradePage({
     redirect("/login?message=Please sign in to edit trades.");
   }
 
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("is_verified")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile?.is_verified) {
+    redirect(
+      "/dashboard?message=Your account is not verified to manage journal data yet.",
+    );
+  }
+
   const { tradeId } = await params;
   const { message } = await searchParams;
   const { data: trade, error } = await supabase
     .from("trades")
     .select(
-      "id, symbol, setup, direction, quantity, entry_price, exit_price, opened_at, closed_at, notes",
+      "id, symbol, setup, direction, quantity, entry_price, exit_price, opened_at, closed_at, notes, thesis, lessons, tags, mistake_tags, followed_plan, confidence_rating, grade",
     )
     .eq("id", tradeId)
     .single();
@@ -56,12 +68,20 @@ export default async function EditTradePage({
               </p>
             </div>
 
-            <Link
-              href="/dashboard"
-              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-white/10"
-            >
-              Back to dashboard
-            </Link>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/journal"
+                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-white/10"
+              >
+                Open journal
+              </Link>
+              <Link
+                href="/dashboard"
+                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-white/10"
+              >
+                Back to dashboard
+              </Link>
+            </div>
           </div>
 
           {message ? (
@@ -88,6 +108,13 @@ export default async function EditTradePage({
             exitPrice: trade.exit_price == null ? null : Number(trade.exit_price),
             closedAt: editStartedAt,
             notes: trade.notes,
+            thesis: trade.thesis,
+            lessons: trade.lessons,
+            tags: trade.tags,
+            mistakeTags: trade.mistake_tags,
+            followedPlan: trade.followed_plan,
+            confidenceRating: trade.confidence_rating,
+            grade: trade.grade,
           }}
         />
       </div>

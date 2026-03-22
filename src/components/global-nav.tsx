@@ -14,7 +14,10 @@ const navItems = [
     href: "/dashboard",
     label: "Personal",
     match: (pathname: string) =>
-      pathname.startsWith("/dashboard") || pathname.startsWith("/login"),
+      pathname.startsWith("/dashboard") ||
+      pathname.startsWith("/journal") ||
+      pathname.startsWith("/trades") ||
+      pathname.startsWith("/login"),
   },
 ];
 

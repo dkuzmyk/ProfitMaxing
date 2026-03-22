@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { signOut } from "@/app/login/actions";
 import { createClient } from "@/lib/supabase/server";
 import {
   formatCurrency,
@@ -44,12 +45,23 @@ export default async function Home() {
               </p>
 
               <div className="flex flex-wrap gap-3">
-                <Link
-                  href="/login"
-                  className="rounded-2xl bg-[#5865f2] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#4752c4]"
-                >
-                  Open personal login
-                </Link>
+                {user ? (
+                  <form action={signOut}>
+                    <button
+                      type="submit"
+                      className="rounded-2xl bg-[#5865f2] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#4752c4]"
+                    >
+                      Sign out
+                    </button>
+                  </form>
+                ) : (
+                  <Link
+                    href="/login"
+                    className="rounded-2xl bg-[#5865f2] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#4752c4]"
+                  >
+                    Open personal login
+                  </Link>
+                )}
                 <Link
                   href="/demo"
                   className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-[#dbdee1] transition hover:bg-white/10"
@@ -111,12 +123,23 @@ export default async function Home() {
               Use this when you want to sign in, save real trades, and work
               against your own private data.
             </p>
-            <Link
-              href="/login"
-              className="mt-6 inline-flex rounded-2xl bg-[#5865f2] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#4752c4]"
-            >
-              Go to personal login
-            </Link>
+            {user ? (
+              <form action={signOut} className="mt-6">
+                <button
+                  type="submit"
+                  className="inline-flex rounded-2xl bg-[#5865f2] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#4752c4]"
+                >
+                  Sign out
+                </button>
+              </form>
+            ) : (
+              <Link
+                href="/login"
+                className="mt-6 inline-flex rounded-2xl bg-[#5865f2] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#4752c4]"
+              >
+                Go to personal login
+              </Link>
+            )}
           </div>
 
           <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6">

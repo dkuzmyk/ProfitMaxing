@@ -24,6 +24,22 @@ function parsePositiveInteger(value: FormDataEntryValue | null) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+function parseOptionalIntegerInRange(
+  value: FormDataEntryValue | null,
+  min: number,
+  max: number,
+) {
+  const raw = String(value ?? "").trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+
+  return Number.isInteger(parsed) && parsed >= min && parsed <= max ? parsed : null;
+}
+
 function parseIsoDate(value: FormDataEntryValue | null) {
   const raw = String(value ?? "");
 
@@ -34,6 +50,31 @@ function parseIsoDate(value: FormDataEntryValue | null) {
   const parsed = new Date(raw);
 
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function parseTextList(value: FormDataEntryValue | null) {
+  return Array.from(
+    new Set(
+      String(value ?? "")
+        .split(/[,\n]/)
+        .map((entry) => entry.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function parseFollowedPlan(value: FormDataEntryValue | null) {
+  const raw = String(value ?? "");
+
+  if (raw === "yes") {
+    return true;
+  }
+
+  if (raw === "no") {
+    return false;
+  }
+
+  return null;
 }
 
 type RedirectTarget = "new" | { tradeId: string };
@@ -56,6 +97,17 @@ function parseTradePayload(formData: FormData, target: RedirectTarget) {
   const entryPrice = parsePositiveNumber(formData.get("entryPrice"));
   const openedAt = parseIsoDate(formData.get("openedAt"));
   const notes = String(formData.get("notes") ?? "").trim() || null;
+  const thesis = String(formData.get("thesis") ?? "").trim() || null;
+  const lessons = String(formData.get("lessons") ?? "").trim() || null;
+  const tags = parseTextList(formData.get("tags"));
+  const mistakeTags = parseTextList(formData.get("mistakeTags"));
+  const followedPlan = parseFollowedPlan(formData.get("followedPlan"));
+  const confidenceRating = parseOptionalIntegerInRange(
+    formData.get("confidenceRating"),
+    1,
+    5,
+  );
+  const grade = String(formData.get("grade") ?? "").trim() || null;
   const isClosed = formData.get("isClosed") === "on";
 
   if (!symbol) {
@@ -76,6 +128,14 @@ function parseTradePayload(formData: FormData, target: RedirectTarget) {
 
   if (!openedAt) {
     fail(target, "Open time is required.");
+  }
+
+  if (String(formData.get("confidenceRating") ?? "").trim() && !confidenceRating) {
+    fail(target, "Confidence rating must be between 1 and 5.");
+  }
+
+  if (grade && !["A", "B", "C", "D", "F"].includes(grade)) {
+    fail(target, "Grade must be A, B, C, D, or F.");
   }
 
   let exitPrice: number | null = null;
@@ -104,6 +164,13 @@ function parseTradePayload(formData: FormData, target: RedirectTarget) {
     opened_at: openedAt,
     closed_at: closedAt,
     notes,
+    thesis,
+    lessons,
+    tags,
+    mistake_tags: mistakeTags,
+    followed_plan: followedPlan,
+    confidence_rating: confidenceRating,
+    grade,
   };
 }
 
@@ -115,6 +182,26 @@ async function requireUser() {
 
   if (!user) {
     redirect("/login?message=Please sign in to manage real trades.");
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("is_verified")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError) {
+    const message = profileError.message.toLowerCase().includes("profiles")
+      ? "Run the latest profiles migration in Supabase before writing journal data."
+      : profileError.message;
+
+    redirect(`/dashboard?message=${encodeURIComponent(message)}`);
+  }
+
+  if (!profile?.is_verified) {
+    redirect(
+      "/dashboard?message=Your account is not verified to write journal data yet.",
+    );
   }
 
   return { supabase, user };

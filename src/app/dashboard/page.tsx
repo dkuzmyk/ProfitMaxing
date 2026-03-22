@@ -91,7 +91,7 @@ export default async function DashboardPage({
   const { data: trades, error: tradesError } = await supabase
     .from("trades")
     .select(
-      "id, symbol, direction, entry_price, exit_price, quantity, opened_at, closed_at",
+      "id, symbol, setup, direction, entry_price, exit_price, quantity, opened_at, closed_at, status, followed_plan, confidence_rating, grade, tags, mistake_tags",
     )
     .order("opened_at", { ascending: false });
 
@@ -125,6 +125,12 @@ export default async function DashboardPage({
               className="rounded-2xl bg-[#5865f2] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#4752c4]"
             >
               Add trade
+            </Link>
+            <Link
+              href="/journal"
+              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-white/10"
+            >
+              Open journal
             </Link>
             <Link
               href="/demo"
@@ -182,52 +188,52 @@ export default async function DashboardPage({
               />
             </div>
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-              <div className="rounded-[24px] bg-[#1e1f22] p-4">
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="min-w-0 rounded-[24px] bg-[#1e1f22] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
                   Total P&amp;L
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-white">
+                <p className="mt-2 break-words text-lg font-semibold leading-tight text-white sm:text-xl">
                   {metrics ? formatCurrency(metrics.totalClosedPnl) : "--"}
                 </p>
               </div>
-              <div className="rounded-[24px] bg-[#1e1f22] p-4">
+              <div className="min-w-0 rounded-[24px] bg-[#1e1f22] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
                   P&amp;L %
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-white">
+                <p className="mt-2 break-words text-lg font-semibold leading-tight text-white sm:text-xl">
                   {metrics ? formatPercent(metrics.pnlPercent) : "--"}
                 </p>
               </div>
-              <div className="rounded-[24px] bg-[#1e1f22] p-4">
+              <div className="min-w-0 rounded-[24px] bg-[#1e1f22] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
                   Currently Invested
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-white">
+                <p className="mt-2 break-words text-lg font-semibold leading-tight text-white sm:text-xl">
                   {metrics ? formatCurrency(metrics.totalCurrentlyInvested) : "--"}
                 </p>
               </div>
-              <div className="rounded-[24px] bg-[#1e1f22] p-4">
+              <div className="min-w-0 rounded-[24px] bg-[#1e1f22] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
                   Total Traded
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-white">
+                <p className="mt-2 break-words text-lg font-semibold leading-tight text-white sm:text-xl">
                   {metrics ? formatCurrency(metrics.totalMoneyTraded) : "--"}
                 </p>
               </div>
-              <div className="rounded-[24px] bg-[#1e1f22] p-4">
+              <div className="min-w-0 rounded-[24px] bg-[#1e1f22] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
                   Return %
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-white">
+                <p className="mt-2 break-words text-lg font-semibold leading-tight text-white sm:text-xl">
                   {metrics ? formatPercent(metrics.returnPercent) : "--"}
                 </p>
               </div>
-              <div className="rounded-[24px] bg-[#1e1f22] p-4">
+              <div className="min-w-0 rounded-[24px] bg-[#1e1f22] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
                   Win Rate
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-white">
+                <p className="mt-2 break-words text-lg font-semibold leading-tight text-white sm:text-xl">
                   {metrics ? formatPercent(metrics.winRate) : "--"}
                 </p>
               </div>
@@ -312,15 +318,18 @@ export default async function DashboardPage({
               <table className="min-w-full divide-y divide-white/8">
                 <thead className="bg-[#1e1f22] text-left text-xs uppercase tracking-[0.18em] text-[#949ba4]">
                   <tr>
-                    <th className="px-4 py-3">Symbol</th>
-                    <th className="px-4 py-3">Direction</th>
+                    <th className="px-4 py-3">Trade</th>
                     <th className="px-4 py-3">Opened</th>
-                    <th className="px-4 py-3">Quantity</th>
-                    <th className="px-4 py-3">Market Value</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Shares</th>
+                    <th className="px-4 py-3">Invested</th>
                     <th className="px-4 py-3">Entry</th>
                     <th className="px-4 py-3">Exit</th>
                     <th className="px-4 py-3">P&amp;L</th>
                     <th className="px-4 py-3">P&amp;L %</th>
+                    <th className="px-4 py-3">Plan</th>
+                    <th className="px-4 py-3">Review</th>
+                    <th className="px-4 py-3">Tags</th>
                     <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -332,14 +341,19 @@ export default async function DashboardPage({
 
                     return (
                       <tr key={trade.id}>
-                        <td className="px-4 py-4 font-medium text-white">
-                          {trade.symbol}
-                        </td>
-                        <td className="px-4 py-4 text-[#b5bac1]">
-                          {trade.direction}
+                        <td className="px-4 py-4">
+                          <p className="font-medium text-white">
+                            {trade.symbol} · {trade.direction}
+                          </p>
+                          <p className="mt-1 text-xs text-[#949ba4]">
+                            {trade.setup || "No setup"}
+                          </p>
                         </td>
                         <td className="px-4 py-4 text-[#b5bac1]">
                           {formatDateTime(trade.opened_at)}
+                        </td>
+                        <td className="px-4 py-4 text-[#b5bac1]">
+                          {trade.status}
                         </td>
                         <td className="px-4 py-4 text-[#b5bac1]">
                           {trade.quantity}
@@ -376,6 +390,42 @@ export default async function DashboardPage({
                           }`}
                         >
                           {pnlPercent == null ? "Pending" : formatPercent(pnlPercent)}
+                        </td>
+                        <td className="px-4 py-4 text-[#b5bac1]">
+                          {trade.followed_plan == null
+                            ? "Unreviewed"
+                            : trade.followed_plan
+                              ? "Followed"
+                              : "Broke"}
+                        </td>
+                        <td className="px-4 py-4 text-[#b5bac1]">
+                          {trade.grade ?? "--"}
+                          {trade.confidence_rating
+                            ? ` · ${trade.confidence_rating}/5`
+                            : ""}
+                        </td>
+                        <td className="px-4 py-4 text-[#b5bac1]">
+                          <div className="flex max-w-xs flex-wrap gap-2">
+                            {trade.tags.slice(0, 2).map((tag) => (
+                              <span
+                                key={tag}
+                                className="rounded-full bg-white/6 px-2 py-1 text-xs text-[#dbdee1]"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                            {trade.mistake_tags.slice(0, 1).map((tag) => (
+                              <span
+                                key={tag}
+                                className="rounded-full bg-rose-500/12 px-2 py-1 text-xs text-rose-300"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                            {trade.tags.length === 0 && trade.mistake_tags.length === 0 ? (
+                              <span className="text-xs text-[#6d7278]">None</span>
+                            ) : null}
+                          </div>
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex items-center justify-end gap-2">

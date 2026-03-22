@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { startTransition } from "react";
 
 import type { TradeRange } from "@/lib/trade-metrics";
@@ -19,6 +19,7 @@ export function DashboardRangePicker({
 }: DashboardRangePickerProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   return (
     <label className="flex flex-col gap-2">
@@ -29,9 +30,14 @@ export function DashboardRangePicker({
         value={selectedRange}
         onChange={(event) => {
           const nextRange = event.target.value;
+          const nextSearchParams = new URLSearchParams(searchParams.toString());
+          nextSearchParams.set("range", nextRange);
+          nextSearchParams.delete("page");
 
           startTransition(() => {
-            router.push(`${pathname}?range=${nextRange}`);
+            router.replace(`${pathname}?${nextSearchParams.toString()}`, {
+              scroll: false,
+            });
           });
         }}
         className="min-w-36 rounded-2xl border border-white/8 bg-[#1e1f22] px-4 py-3 text-sm font-medium text-white outline-none transition hover:bg-[#18191c] focus:border-[#5865f2]"
