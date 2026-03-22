@@ -16,6 +16,8 @@ const navItems = [
     match: (pathname: string) =>
       pathname.startsWith("/dashboard") ||
       pathname.startsWith("/journal") ||
+      pathname.startsWith("/analytics") ||
+      pathname.startsWith("/playbook") ||
       pathname.startsWith("/trades") ||
       pathname.startsWith("/login"),
   },

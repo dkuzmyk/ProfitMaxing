@@ -1,7 +1,7 @@
 import Link from "next/link";
 
-import { signOut } from "@/app/login/actions";
 import { DashboardRangePicker } from "@/components/dashboard-range-picker";
+import { WorkspaceTabs } from "@/components/workspace-tabs";
 import {
   formatCurrency,
   formatDateTime,
@@ -9,7 +9,6 @@ import {
   getDemoMetrics,
   type DemoTrade,
 } from "@/lib/demo-data";
-import { createClient } from "@/lib/supabase/server";
 import { getTradeRangeLabel, normalizeTradeRange } from "@/lib/trade-metrics";
 
 const rangeOptions = [
@@ -44,10 +43,6 @@ export default async function DemoJournalPage({
     mistake?: string;
   }>;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
   const resolvedSearchParams = await searchParams;
   const selectedRange = normalizeTradeRange(resolvedSearchParams.range);
   const baseTrades = getDemoMetrics(selectedRange).trades;
@@ -126,45 +121,22 @@ export default async function DemoJournalPage({
   return (
     <main className="px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <section className="flex flex-col gap-4 rounded-[28px] border border-white/8 bg-[#2b2d31] p-8 shadow-[0_32px_80px_rgba(0,0,0,0.35)] md:flex-row md:items-end md:justify-between">
+        <WorkspaceTabs variant="demo" />
+
+        <section className="flex flex-col gap-4 rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)] md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-sm font-medium uppercase tracking-[0.25em] text-[#949ba4]">
+            <p className="text-xs font-medium uppercase tracking-[0.22em] text-[#949ba4]">
               Demo Journal
             </p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">
               Filter the demo like a real account
             </h1>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-[#b5bac1]">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#b5bac1]">
               {getTradeRangeLabel(selectedRange)}. Guests can inspect setups,
               mistakes, and plan adherence, but cannot insert or modify data.
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/demo"
-              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-white/10"
-            >
-              Back to demo dashboard
-            </Link>
-            {user ? (
-              <form action={signOut}>
-                <button
-                  type="submit"
-                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-white/10"
-                >
-                  Sign out
-                </button>
-              </form>
-            ) : (
-              <Link
-                href="/login"
-                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-white/10"
-              >
-                Go to personal login
-              </Link>
-            )}
-          </div>
         </section>
 
         <section className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
@@ -390,76 +362,75 @@ export default async function DemoJournalPage({
           </div>
 
           {filteredTrades.length > 0 ? (
-            <div className="mt-5 overflow-hidden rounded-[24px] border border-white/8">
-              <table className="min-w-full divide-y divide-white/8">
-                <thead className="bg-[#1e1f22] text-left text-xs uppercase tracking-[0.18em] text-[#949ba4]">
+            <div className="mt-5 rounded-[24px] border border-white/8">
+              <div className="overflow-x-auto">
+                <table className="min-w-[1200px] w-full divide-y divide-white/8">
+                <thead className="bg-[#1e1f22] text-left text-[11px] uppercase tracking-[0.16em] text-[#949ba4]">
                   <tr>
-                    <th className="px-4 py-3">Trade</th>
-                    <th className="px-4 py-3">Opened</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Shares</th>
-                    <th className="px-4 py-3">Invested</th>
-                    <th className="px-4 py-3">Entry</th>
-                    <th className="px-4 py-3">Exit</th>
-                    <th className="px-4 py-3">P&amp;L</th>
-                    <th className="px-4 py-3">Return</th>
-                    <th className="px-4 py-3">Plan</th>
-                    <th className="px-4 py-3">Review</th>
-                    <th className="px-4 py-3">Tags</th>
-                    <th className="px-4 py-3 text-right">View</th>
+                    <th className="w-[124px] px-2 py-2.5">Trade</th>
+                    <th className="w-[106px] px-2 py-2.5">Opened</th>
+                    <th className="w-[68px] px-2 py-2.5">Status</th>
+                    <th className="w-[64px] px-2 py-2.5">Shares</th>
+                    <th className="w-[104px] px-2 py-2.5">Invested</th>
+                    <th className="w-[88px] px-2 py-2.5">Entry</th>
+                    <th className="w-[88px] px-2 py-2.5">Exit</th>
+                    <th className="w-[96px] px-2 py-2.5">P&amp;L</th>
+                    <th className="w-[78px] px-2 py-2.5">Return</th>
+                    <th className="w-[88px] px-2 py-2.5">Review</th>
+                    <th className="w-[150px] px-2 py-2.5">Tags</th>
+                    <th className="w-[72px] px-2 py-2.5 text-right">View</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/6 bg-[#2b2d31] text-sm">
+                <tbody className="divide-y divide-white/6 bg-[#2b2d31] text-[13px]">
                   {filteredTrades.map((trade) => (
                     <tr key={trade.id} className="hover:bg-white/4">
-                      <td className="px-4 py-4">
-                        <p className="font-medium text-white">
+                      <td className="px-2 py-2.5">
+                        <p className="whitespace-nowrap font-medium text-white">
                           {trade.symbol} · {trade.direction}
                         </p>
-                        <p className="mt-1 text-xs text-[#949ba4]">{trade.setup}</p>
+                        <p className="mt-1 max-w-[98px] truncate text-xs text-[#949ba4]">
+                          {trade.setup}
+                        </p>
                       </td>
-                      <td className="px-4 py-4 text-[#b5bac1]">
+                      <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                         {formatDateTime(trade.openedAt)}
                       </td>
-                      <td className="px-4 py-4 text-[#b5bac1]">Closed</td>
-                      <td className="px-4 py-4 text-[#b5bac1]">
+                      <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">Closed</td>
+                      <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                         {trade.quantity}
                       </td>
-                      <td className="px-4 py-4 text-[#b5bac1]">
+                      <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                         {formatCurrency(getMarketValue(trade))}
                       </td>
-                      <td className="px-4 py-4 text-[#b5bac1]">
+                      <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                         {formatCurrency(trade.entryPrice)}
                       </td>
-                      <td className="px-4 py-4 text-[#b5bac1]">
+                      <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                         {formatCurrency(trade.exitPrice)}
                       </td>
                       <td
-                        className={`px-4 py-4 font-medium ${
+                        className={`whitespace-nowrap px-2 py-2.5 font-medium ${
                           trade.pnl >= 0 ? "text-emerald-400" : "text-rose-400"
                         }`}
                       >
                         {formatCurrency(trade.pnl)}
                       </td>
                       <td
-                        className={`px-4 py-4 font-medium ${
+                        className={`whitespace-nowrap px-2 py-2.5 font-medium ${
                           trade.pnlPercent >= 0 ? "text-emerald-400" : "text-rose-400"
                         }`}
                       >
                         {formatPercent(trade.pnlPercent / 100)}
                       </td>
-                      <td className="px-4 py-4 text-[#b5bac1]">
-                        {trade.followedPlan ? "Followed" : "Broke"}
-                      </td>
-                      <td className="px-4 py-4 text-[#b5bac1]">
+                      <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                         {trade.grade} · {trade.confidenceRating}/5
                       </td>
-                      <td className="px-4 py-4 text-[#b5bac1]">
-                        <div className="flex max-w-xs flex-wrap gap-2">
+                      <td className="px-2 py-2.5 text-[#b5bac1]">
+                        <div className="flex max-w-[136px] flex-wrap gap-1">
                           {trade.tags.slice(0, 2).map((tag) => (
                             <span
                               key={tag}
-                              className="rounded-full bg-white/6 px-2 py-1 text-xs text-[#dbdee1]"
+                              className="rounded-full bg-white/6 px-2 py-1 text-[11px] text-[#dbdee1]"
                             >
                               {tag}
                             </span>
@@ -467,17 +438,17 @@ export default async function DemoJournalPage({
                           {trade.mistakes.slice(0, 1).map((mistake) => (
                             <span
                               key={mistake}
-                              className="rounded-full bg-rose-500/12 px-2 py-1 text-xs text-rose-300"
+                              className="rounded-full bg-rose-500/12 px-2 py-1 text-[11px] text-rose-300"
                             >
                               {mistake}
                             </span>
                           ))}
                           {trade.tags.length === 0 && trade.mistakes.length === 0 ? (
-                            <span className="text-xs text-[#6d7278]">None</span>
+                            <span className="text-[11px] text-[#6d7278]">None</span>
                           ) : null}
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-right">
+                      <td className="px-2 py-2.5 text-right">
                         <Link
                           href={`/demo/trades/${trade.id}`}
                           className="rounded-xl border border-white/10 bg-[#1e1f22] px-3 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-[#18191c] hover:text-white"
@@ -488,7 +459,8 @@ export default async function DemoJournalPage({
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             </div>
           ) : (
             <div className="mt-5 rounded-[24px] border border-white/8 bg-[#1e1f22] px-4 py-4 text-sm leading-7 text-[#b5bac1]">

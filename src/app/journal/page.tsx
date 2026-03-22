@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { DashboardRangePicker } from "@/components/dashboard-range-picker";
+import { WorkspaceTabs } from "@/components/workspace-tabs";
+import { deleteTrade } from "@/app/trades/actions";
 import { formatCurrency, formatDateTime, formatPercent } from "@/lib/demo-data";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -55,6 +57,45 @@ type JournalTrade = {
   tags: string[];
   mistake_tags: string[];
 };
+
+function EditIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4z" />
+    </svg>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 14H6L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
+  );
+}
 
 function normalizeListFilter(value: string | undefined) {
   return value?.trim().toLowerCase() ?? "";
@@ -248,15 +289,17 @@ export default async function JournalPage({
   return (
     <main className="px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <section className="flex flex-col gap-4 rounded-[28px] border border-white/8 bg-[#2b2d31] p-8 shadow-[0_32px_80px_rgba(0,0,0,0.35)] md:flex-row md:items-end md:justify-between">
+        <WorkspaceTabs variant="real" />
+
+        <section className="flex flex-col gap-4 rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)] md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-sm font-medium uppercase tracking-[0.25em] text-[#949ba4]">
+            <p className="text-xs font-medium uppercase tracking-[0.22em] text-[#949ba4]">
               Real Journal
             </p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">
               Review setups and mistakes
             </h1>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-[#b5bac1]">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#b5bac1]">
               {getTradeRangeLabel(selectedRange)}. Use the filters to isolate
               winning conditions, repeated mistakes, and plan adherence.
             </p>
@@ -268,12 +311,6 @@ export default async function JournalPage({
               className="rounded-2xl bg-[#5865f2] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#4752c4]"
             >
               Add trade
-            </Link>
-            <Link
-              href="/dashboard"
-              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-white/10"
-            >
-              Back to dashboard
             </Link>
           </div>
         </section>
@@ -536,54 +573,51 @@ export default async function JournalPage({
               using the new journaling fields.
             </p>
           ) : safeTrades.length > 0 ? (
-            <div className="mt-5 overflow-hidden rounded-[24px] border border-white/8">
-              <table className="min-w-full divide-y divide-white/8">
-                <thead className="bg-[#1e1f22] text-left text-xs uppercase tracking-[0.18em] text-[#949ba4]">
+            <div className="mt-5 rounded-[24px] border border-white/8">
+              <div className="overflow-x-auto">
+                <table className="min-w-[1140px] w-full divide-y divide-white/8">
+                <thead className="bg-[#1e1f22] text-left text-[11px] uppercase tracking-[0.16em] text-[#949ba4]">
                   <tr>
-                    <th className="px-4 py-3">Trade</th>
-                    <th className="px-4 py-3">Opened</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Invested</th>
-                    <th className="px-4 py-3">Entry</th>
-                    <th className="px-4 py-3">Exit</th>
-                    <th className="px-4 py-3">P&amp;L</th>
-                    <th className="px-4 py-3">Return</th>
-                    <th className="px-4 py-3">Plan</th>
-                    <th className="px-4 py-3">Review</th>
-                    <th className="px-4 py-3">Tags</th>
-                    <th className="px-4 py-3 text-right">Edit</th>
+                    <th className="w-[112px] px-2 py-2.5">Trade</th>
+                    <th className="w-[106px] px-2 py-2.5">Opened</th>
+                    <th className="w-[68px] px-2 py-2.5">Status</th>
+                    <th className="w-[104px] px-2 py-2.5">Invested</th>
+                    <th className="w-[88px] px-2 py-2.5">Entry</th>
+                    <th className="w-[88px] px-2 py-2.5">Exit</th>
+                    <th className="w-[96px] px-2 py-2.5">P&amp;L</th>
+                    <th className="w-[78px] px-2 py-2.5">Return</th>
+                    <th className="w-[88px] px-2 py-2.5">Review</th>
+                    <th className="w-[150px] px-2 py-2.5">Tags</th>
+                    <th className="w-[92px] px-2 py-2.5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/6 text-sm">
+                <tbody className="divide-y divide-white/6 text-[13px]">
                   {safeTrades.map((trade) => (
                     <tr key={trade.id}>
-                      <td className="px-4 py-4">
-                        <p className="font-medium text-white">
+                      <td className="px-2 py-2.5">
+                        <p className="whitespace-nowrap font-medium text-white">
                           {trade.symbol} · {trade.direction}
                         </p>
-                        <p className="mt-1 text-xs text-[#949ba4]">
-                          {trade.setup || "No setup"}
-                        </p>
                       </td>
-                      <td className="px-4 py-4 text-[#b5bac1]">
+                      <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                         {formatDateTime(trade.opened_at)}
                       </td>
-                      <td className="px-4 py-4 text-[#b5bac1]">
+                      <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                         {trade.status}
                       </td>
-                      <td className="px-4 py-4 text-[#b5bac1]">
+                      <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                         {formatCurrency(Number(trade.entry_value))}
                       </td>
-                      <td className="px-4 py-4 text-[#b5bac1]">
+                      <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                         {formatCurrency(Number(trade.entry_price))}
                       </td>
-                      <td className="px-4 py-4 text-[#b5bac1]">
+                      <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                         {trade.exit_price == null
                           ? "Open"
                           : formatCurrency(Number(trade.exit_price))}
                       </td>
                       <td
-                        className={`px-4 py-4 font-medium ${
+                        className={`whitespace-nowrap px-2 py-2.5 font-medium ${
                           Number(trade.realized_pnl) >= 0
                             ? "text-emerald-400"
                             : "text-rose-400"
@@ -594,7 +628,7 @@ export default async function JournalPage({
                           : "Open"}
                       </td>
                       <td
-                        className={`px-4 py-4 font-medium ${
+                        className={`whitespace-nowrap px-2 py-2.5 font-medium ${
                           Number(trade.realized_pnl_percent ?? 0) >= 0
                             ? "text-emerald-400"
                             : "text-rose-400"
@@ -604,25 +638,18 @@ export default async function JournalPage({
                           ? "Open"
                           : formatPercent(Number(trade.realized_pnl_percent))}
                       </td>
-                      <td className="px-4 py-4 text-[#b5bac1]">
-                        {trade.followed_plan == null
-                          ? "Unreviewed"
-                          : trade.followed_plan
-                            ? "Followed"
-                            : "Broke"}
-                      </td>
-                      <td className="px-4 py-4 text-[#b5bac1]">
+                      <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                         {trade.grade || "--"}
                         {trade.confidence_rating
                           ? ` · ${trade.confidence_rating}/5`
                           : ""}
                       </td>
-                      <td className="px-4 py-4 text-[#b5bac1]">
-                        <div className="flex max-w-xs flex-wrap gap-2">
+                      <td className="px-2 py-2.5 text-[#b5bac1]">
+                        <div className="flex max-w-[136px] flex-wrap gap-1">
                           {trade.tags.slice(0, 2).map((tag) => (
                             <span
                               key={tag}
-                              className="rounded-full bg-white/6 px-2 py-1 text-xs text-[#dbdee1]"
+                              className="rounded-full bg-white/6 px-2 py-1 text-[11px] text-[#dbdee1]"
                             >
                               {tag}
                             </span>
@@ -630,28 +657,44 @@ export default async function JournalPage({
                           {trade.mistake_tags.slice(0, 1).map((tag) => (
                             <span
                               key={tag}
-                              className="rounded-full bg-rose-500/12 px-2 py-1 text-xs text-rose-300"
+                              className="rounded-full bg-rose-500/12 px-2 py-1 text-[11px] text-rose-300"
                             >
                               {tag}
                             </span>
                           ))}
                           {trade.tags.length === 0 && trade.mistake_tags.length === 0 ? (
-                            <span className="text-xs text-[#6d7278]">None</span>
+                            <span className="text-[11px] text-[#6d7278]">None</span>
                           ) : null}
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-right">
-                        <Link
-                          href={`/trades/${trade.id}/edit`}
-                          className="rounded-xl border border-white/10 bg-[#1e1f22] px-3 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-[#18191c] hover:text-white"
-                        >
-                          Edit
-                        </Link>
+                      <td className="px-2 py-2.5">
+                        <div className="flex items-center justify-end gap-2">
+                          <Link
+                            href={`/trades/${trade.id}/edit`}
+                            aria-label={`Edit ${trade.symbol} trade`}
+                            title="Edit trade"
+                            className="rounded-xl border border-white/10 bg-[#1e1f22] p-2 text-[#b5bac1] transition hover:border-[#5865f2]/40 hover:bg-[#16171a] hover:text-white"
+                          >
+                            <EditIcon />
+                          </Link>
+                          <form action={deleteTrade}>
+                            <input type="hidden" name="tradeId" value={trade.id} />
+                            <button
+                              type="submit"
+                              aria-label={`Delete ${trade.symbol} trade`}
+                              title="Delete trade"
+                              className="rounded-xl border border-white/10 bg-[#1e1f22] p-2 text-[#b5bac1] transition hover:border-rose-500/40 hover:bg-[#16171a] hover:text-rose-300"
+                            >
+                              <DeleteIcon />
+                            </button>
+                          </form>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             </div>
           ) : (
             <div className="mt-5 rounded-2xl border border-white/8 bg-[#1e1f22] px-4 py-4 text-sm leading-7 text-[#b5bac1]">

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { signOut } from "@/app/login/actions";
 import { CumulativePnlChart } from "@/components/cumulative-pnl-chart";
 import { DashboardRangePicker } from "@/components/dashboard-range-picker";
+import { WorkspaceTabs } from "@/components/workspace-tabs";
 import { formatCurrency, formatDateTime, formatPercent } from "@/lib/demo-data";
 import { createClient } from "@/lib/supabase/server";
 import { deleteTrade } from "@/app/trades/actions";
@@ -106,48 +107,7 @@ export default async function DashboardPage({
   return (
     <main className="px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <header className="flex flex-col gap-4 rounded-[28px] border border-white/8 bg-[#2b2d31] p-8 shadow-[0_32px_80px_rgba(0,0,0,0.35)] md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-[0.25em] text-[#949ba4]">
-              Real Dashboard
-            </p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">
-              Welcome back
-            </h1>
-            <p className="mt-3 text-sm leading-7 text-[#b5bac1]">
-              Signed in as {user.email ?? "a real user"}.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/trades/new"
-              className="rounded-2xl bg-[#5865f2] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#4752c4]"
-            >
-              Add trade
-            </Link>
-            <Link
-              href="/journal"
-              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-white/10"
-            >
-              Open journal
-            </Link>
-            <Link
-              href="/demo"
-              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-white/10"
-            >
-              Switch to guest demo
-            </Link>
-            <form action={signOut}>
-              <button
-                type="submit"
-                className="rounded-2xl border border-white/10 bg-[#1e1f22] px-4 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-[#111214]"
-              >
-                Sign out
-              </button>
-            </form>
-          </div>
-        </header>
+        <WorkspaceTabs variant="real" />
 
         {created || updated || deleted || message ? (
           <div
@@ -165,6 +125,83 @@ export default async function DashboardPage({
                   : "Trade deleted.")}
           </div>
         ) : null}
+
+        <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
+            <p className="text-xs font-medium uppercase tracking-[0.22em] text-[#949ba4]">
+              Real Dashboard
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+              Performance workspace
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#b5bac1]">
+              Review current performance, then use the controls panel to add or
+              import trades without mixing those actions into account controls.
+            </p>
+
+            <div className="mt-5 rounded-[24px] bg-[#1e1f22] p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
+                Signed in
+              </p>
+              <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm font-medium text-white">
+                  {user.email ?? "Real user"}
+                </p>
+                <form action={signOut}>
+                  <button
+                    type="submit"
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-white/10"
+                  >
+                    Sign out
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
+            <p className="text-xs font-medium uppercase tracking-[0.22em] text-[#949ba4]">
+              Controls
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+              Add or import trades
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[#b5bac1]">
+              Manual entry is live. Import and broker sync actions stay here so
+              navigation remains separate from data-entry workflows.
+            </p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <Link
+                href="/trades/new"
+                className="rounded-[22px] bg-[#5865f2] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#4752c4]"
+              >
+                Add trade
+              </Link>
+              <button
+                type="button"
+                disabled
+                className="rounded-[22px] border border-white/10 bg-[#1e1f22] px-4 py-3 text-left text-sm font-medium text-[#6d7278]"
+              >
+                CSV import soon
+              </button>
+              <button
+                type="button"
+                disabled
+                className="rounded-[22px] border border-white/10 bg-[#1e1f22] px-4 py-3 text-left text-sm font-medium text-[#6d7278]"
+              >
+                Webull sync soon
+              </button>
+              <button
+                type="button"
+                disabled
+                className="rounded-[22px] border border-white/10 bg-[#1e1f22] px-4 py-3 text-left text-sm font-medium text-[#6d7278]"
+              >
+                Broker sync soon
+              </button>
+            </div>
+          </div>
+        </section>
 
         <section className="grid gap-4 lg:grid-cols-[1.45fr_0.55fr]">
           <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
@@ -314,26 +351,26 @@ export default async function DashboardPage({
               created the table, double-check that the SQL ran successfully.
             </p>
           ) : recentTrades.length > 0 ? (
-            <div className="mt-5 overflow-hidden rounded-[24px] border border-white/8">
-              <table className="min-w-full divide-y divide-white/8">
-                <thead className="bg-[#1e1f22] text-left text-xs uppercase tracking-[0.18em] text-[#949ba4]">
+            <div className="mt-5 rounded-[24px] border border-white/8">
+              <div className="overflow-x-auto">
+                <table className="min-w-[1180px] w-full divide-y divide-white/8">
+                <thead className="bg-[#1e1f22] text-left text-[11px] uppercase tracking-[0.16em] text-[#949ba4]">
                   <tr>
-                    <th className="px-4 py-3">Trade</th>
-                    <th className="px-4 py-3">Opened</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Shares</th>
-                    <th className="px-4 py-3">Invested</th>
-                    <th className="px-4 py-3">Entry</th>
-                    <th className="px-4 py-3">Exit</th>
-                    <th className="px-4 py-3">P&amp;L</th>
-                    <th className="px-4 py-3">P&amp;L %</th>
-                    <th className="px-4 py-3">Plan</th>
-                    <th className="px-4 py-3">Review</th>
-                    <th className="px-4 py-3">Tags</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
+                    <th className="w-[112px] px-2 py-2.5">Trade</th>
+                    <th className="w-[106px] px-2 py-2.5">Opened</th>
+                    <th className="w-[68px] px-2 py-2.5">Status</th>
+                    <th className="w-[64px] px-2 py-2.5">Shares</th>
+                    <th className="w-[104px] px-2 py-2.5">Invested</th>
+                    <th className="w-[88px] px-2 py-2.5">Entry</th>
+                    <th className="w-[88px] px-2 py-2.5">Exit</th>
+                    <th className="w-[96px] px-2 py-2.5">P&amp;L</th>
+                    <th className="w-[78px] px-2 py-2.5">P&amp;L %</th>
+                    <th className="w-[88px] px-2 py-2.5">Review</th>
+                    <th className="w-[150px] px-2 py-2.5">Tags</th>
+                    <th className="w-[78px] px-2 py-2.5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/6 text-sm">
+                <tbody className="divide-y divide-white/6 text-[13px]">
                   {recentTrades.map((trade) => {
                     const pnl = getTradePnl(trade);
                     const marketValue = getTradeMarketValue(trade);
@@ -341,36 +378,33 @@ export default async function DashboardPage({
 
                     return (
                       <tr key={trade.id}>
-                        <td className="px-4 py-4">
-                          <p className="font-medium text-white">
+                        <td className="px-2 py-2.5">
+                          <p className="whitespace-nowrap font-medium text-white">
                             {trade.symbol} · {trade.direction}
                           </p>
-                          <p className="mt-1 text-xs text-[#949ba4]">
-                            {trade.setup || "No setup"}
-                          </p>
                         </td>
-                        <td className="px-4 py-4 text-[#b5bac1]">
+                        <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                           {formatDateTime(trade.opened_at)}
                         </td>
-                        <td className="px-4 py-4 text-[#b5bac1]">
+                        <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                           {trade.status}
                         </td>
-                        <td className="px-4 py-4 text-[#b5bac1]">
+                        <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                           {trade.quantity}
                         </td>
-                        <td className="px-4 py-4 text-[#b5bac1]">
+                        <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                           {formatCurrency(marketValue)}
                         </td>
-                        <td className="px-4 py-4 text-[#b5bac1]">
+                        <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                           {formatCurrency(Number(trade.entry_price))}
                         </td>
-                        <td className="px-4 py-4 text-[#b5bac1]">
+                        <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                           {trade.exit_price
                             ? formatCurrency(Number(trade.exit_price))
                             : "Open"}
                         </td>
                         <td
-                          className={`px-4 py-4 font-medium ${
+                          className={`whitespace-nowrap px-2 py-2.5 font-medium ${
                             pnl == null
                               ? "text-[#949ba4]"
                               : pnl >= 0
@@ -381,7 +415,7 @@ export default async function DashboardPage({
                           {pnl == null ? "Pending" : formatCurrency(pnl)}
                         </td>
                         <td
-                          className={`px-4 py-4 font-medium ${
+                          className={`whitespace-nowrap px-2 py-2.5 font-medium ${
                             pnlPercent == null
                               ? "text-[#949ba4]"
                               : pnlPercent >= 0
@@ -391,25 +425,18 @@ export default async function DashboardPage({
                         >
                           {pnlPercent == null ? "Pending" : formatPercent(pnlPercent)}
                         </td>
-                        <td className="px-4 py-4 text-[#b5bac1]">
-                          {trade.followed_plan == null
-                            ? "Unreviewed"
-                            : trade.followed_plan
-                              ? "Followed"
-                              : "Broke"}
-                        </td>
-                        <td className="px-4 py-4 text-[#b5bac1]">
+                        <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                           {trade.grade ?? "--"}
                           {trade.confidence_rating
                             ? ` · ${trade.confidence_rating}/5`
                             : ""}
                         </td>
-                        <td className="px-4 py-4 text-[#b5bac1]">
-                          <div className="flex max-w-xs flex-wrap gap-2">
+                        <td className="px-2 py-2.5 text-[#b5bac1]">
+                          <div className="flex max-w-[136px] flex-wrap gap-1">
                             {trade.tags.slice(0, 2).map((tag) => (
                               <span
                                 key={tag}
-                                className="rounded-full bg-white/6 px-2 py-1 text-xs text-[#dbdee1]"
+                                className="rounded-full bg-white/6 px-2 py-1 text-[11px] text-[#dbdee1]"
                               >
                                 {tag}
                               </span>
@@ -417,17 +444,17 @@ export default async function DashboardPage({
                             {trade.mistake_tags.slice(0, 1).map((tag) => (
                               <span
                                 key={tag}
-                                className="rounded-full bg-rose-500/12 px-2 py-1 text-xs text-rose-300"
+                                className="rounded-full bg-rose-500/12 px-2 py-1 text-[11px] text-rose-300"
                               >
                                 {tag}
                               </span>
                             ))}
                             {trade.tags.length === 0 && trade.mistake_tags.length === 0 ? (
-                              <span className="text-xs text-[#6d7278]">None</span>
+                              <span className="text-[11px] text-[#6d7278]">None</span>
                             ) : null}
                           </div>
                         </td>
-                        <td className="px-4 py-4">
+                        <td className="px-2 py-2.5">
                           <div className="flex items-center justify-end gap-2">
                             <Link
                               href={`/trades/${trade.id}/edit`}
@@ -454,7 +481,8 @@ export default async function DashboardPage({
                     );
                   })}
                 </tbody>
-              </table>
+                </table>
+              </div>
             </div>
           ) : (
             <div className="mt-4 rounded-2xl border border-white/8 bg-[#1e1f22] px-4 py-4 text-sm leading-7 text-[#b5bac1]">
