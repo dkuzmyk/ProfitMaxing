@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { signOut } from "@/app/login/actions";
 import { CumulativePnlChart } from "@/components/cumulative-pnl-chart";
 import { DashboardRangePicker } from "@/components/dashboard-range-picker";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
@@ -106,7 +105,7 @@ export default async function DashboardPage({
 
   return (
     <main className="px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
         <WorkspaceTabs variant="real" />
 
         {created || updated || deleted || message ? (
@@ -126,80 +125,35 @@ export default async function DashboardPage({
           </div>
         ) : null}
 
-        <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
-            <p className="text-xs font-medium uppercase tracking-[0.22em] text-[#949ba4]">
-              Real Dashboard
-            </p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-              Performance workspace
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#b5bac1]">
-              Review current performance, then use the controls panel to add or
-              import trades without mixing those actions into account controls.
-            </p>
-
-            <div className="mt-5 rounded-[24px] bg-[#1e1f22] p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                Signed in
-              </p>
-              <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm font-medium text-white">
-                  {user.email ?? "Real user"}
-                </p>
-                <form action={signOut}>
-                  <button
-                    type="submit"
-                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-[#dbdee1] transition hover:bg-white/10"
-                  >
-                    Sign out
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
-            <p className="text-xs font-medium uppercase tracking-[0.22em] text-[#949ba4]">
-              Controls
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-              Add or import trades
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-[#b5bac1]">
-              Manual entry is live. Import and broker sync actions stay here so
-              navigation remains separate from data-entry workflows.
-            </p>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <Link
-                href="/trades/new"
-                className="rounded-[22px] bg-[#5865f2] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#4752c4]"
-              >
-                Add trade
-              </Link>
-              <button
-                type="button"
-                disabled
-                className="rounded-[22px] border border-white/10 bg-[#1e1f22] px-4 py-3 text-left text-sm font-medium text-[#6d7278]"
-              >
-                CSV import soon
-              </button>
-              <button
-                type="button"
-                disabled
-                className="rounded-[22px] border border-white/10 bg-[#1e1f22] px-4 py-3 text-left text-sm font-medium text-[#6d7278]"
-              >
-                Webull sync soon
-              </button>
-              <button
-                type="button"
-                disabled
-                className="rounded-[22px] border border-white/10 bg-[#1e1f22] px-4 py-3 text-left text-sm font-medium text-[#6d7278]"
-              >
-                Broker sync soon
-              </button>
-            </div>
+        <section className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
+          <div className="grid gap-3 md:grid-cols-4">
+            <Link
+              href="/trades/new"
+              className="rounded-[22px] bg-[#5865f2] px-4 py-3 text-center text-sm font-medium text-white transition hover:bg-[#4752c4]"
+            >
+              Add trade
+            </Link>
+            <button
+              type="button"
+              disabled
+              className="rounded-[22px] border border-white/10 bg-[#1e1f22] px-4 py-3 text-sm font-medium text-[#6d7278]"
+            >
+              CSV import soon
+            </button>
+            <button
+              type="button"
+              disabled
+              className="rounded-[22px] border border-white/10 bg-[#1e1f22] px-4 py-3 text-sm font-medium text-[#6d7278]"
+            >
+              Webull sync soon
+            </button>
+            <button
+              type="button"
+              disabled
+              className="rounded-[22px] border border-white/10 bg-[#1e1f22] px-4 py-3 text-sm font-medium text-[#6d7278]"
+            >
+              Broker sync soon
+            </button>
           </div>
         </section>
 

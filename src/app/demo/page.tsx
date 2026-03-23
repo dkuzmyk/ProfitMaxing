@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { CumulativePnlChart } from "@/components/cumulative-pnl-chart";
 import { DashboardRangePicker } from "@/components/dashboard-range-picker";
+import { DemoControlsStrip } from "@/components/demo-controls-strip";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import {
   formatCurrency,
@@ -9,7 +10,7 @@ import {
   getDemoMetrics,
   type DemoTrade,
 } from "@/lib/demo-data";
-import { getTradeRangeLabel, normalizeTradeRange } from "@/lib/trade-metrics";
+import { normalizeTradeRange } from "@/lib/trade-metrics";
 
 const rangeOptions = [
   { value: "1d", label: "1D" },
@@ -38,72 +39,10 @@ export default async function DemoOverviewPage({
 
   return (
     <main className="px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
         <WorkspaceTabs variant="demo" />
 
-        <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
-            <p className="text-xs font-medium uppercase tracking-[0.22em] text-[#949ba4]">
-              Demo Dashboard
-            </p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-              Read-only product walkthrough
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#b5bac1]">
-              Synthetic data only. {getTradeRangeLabel(selectedRange)}. Use the
-              tabs above to inspect the same workflow without touching real
-              trades.
-            </p>
-          </div>
-
-          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
-            <p className="text-xs font-medium uppercase tracking-[0.22em] text-[#949ba4]">
-              Demo Mode
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-              Guest access profile
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-[#b5bac1]">
-              This workspace mirrors the real one, but remains read-only and
-              fully synthetic.
-            </p>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-[22px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  Data policy
-                </p>
-                <p className="mt-2 text-sm font-medium text-white">
-                  No write access
-                </p>
-              </div>
-              <div className="rounded-[22px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  History
-                </p>
-                <p className="mt-2 text-sm font-medium text-white">
-                  One synthetic year
-                </p>
-              </div>
-              <div className="rounded-[22px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  Trade set
-                </p>
-                <p className="mt-2 text-sm font-medium text-white">
-                  {metrics.trades.length} trades in range
-                </p>
-              </div>
-              <div className="rounded-[22px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  Return profile
-                </p>
-                <p className="mt-2 text-sm font-medium text-white">
-                  {formatPercent(metrics.returnPercent)} in range
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
+        <DemoControlsStrip />
 
         <section className="grid gap-4 lg:grid-cols-[1.45fr_0.55fr]">
           <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
