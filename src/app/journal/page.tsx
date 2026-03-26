@@ -35,6 +35,7 @@ type JournalSearchParams = {
   tag?: string;
   mistake?: string;
   page?: string;
+  imported?: string;
 };
 
 type JournalTrade = {
@@ -152,6 +153,9 @@ export default async function JournalPage({
   }
 
   const resolvedSearchParams = await searchParams;
+  const importedCount = resolvedSearchParams.imported
+    ? Number.parseInt(resolvedSearchParams.imported, 10) || 0
+    : null;
   const selectedRange = normalizeTradeRange(resolvedSearchParams.range);
   const rangeCutoff = getTradeRangeCutoff(selectedRange);
   const rangeCutoffDate = rangeCutoff?.toISOString().slice(0, 10);
@@ -290,6 +294,12 @@ export default async function JournalPage({
     <main className="px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
         <WorkspaceTabs variant="real" />
+
+        {importedCount != null && importedCount > 0 && (
+          <div className="rounded-[24px] border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+            {importedCount} trade{importedCount === 1 ? "" : "s"} imported successfully.
+          </div>
+        )}
 
         <section className="flex flex-col gap-4 rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)] md:flex-row md:items-start md:justify-between">
           <div>
@@ -593,11 +603,14 @@ export default async function JournalPage({
                 </thead>
                 <tbody className="divide-y divide-white/6 text-[13px]">
                   {safeTrades.map((trade) => (
-                    <tr key={trade.id}>
+                    <tr key={trade.id} className="transition hover:bg-white/[0.02]">
                       <td className="px-2 py-2.5">
-                        <p className="whitespace-nowrap font-medium text-white">
+                        <Link
+                          href={`/trades/${trade.id}`}
+                          className="whitespace-nowrap font-medium text-white transition hover:text-[#5865f2]"
+                        >
                           {trade.symbol} · {trade.direction}
-                        </p>
+                        </Link>
                       </td>
                       <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                         {formatDateTime(trade.opened_at)}

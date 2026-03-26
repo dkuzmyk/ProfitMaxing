@@ -212,6 +212,28 @@ export function filterTradesByRange(trades: StoredTrade[], range: TradeRange) {
   });
 }
 
+export type DailyPnlPoint = {
+  date: string;
+  pnl: number;
+  tradeCount: number;
+};
+
+export function getDailyPnlSeries(trades: StoredTrade[]): DailyPnlPoint[] {
+  const byDate = new Map<string, { pnl: number; count: number }>();
+
+  for (const trade of trades) {
+    if (!isClosedTrade(trade)) continue;
+    const date = trade.closed_at.slice(0, 10);
+    const pnl = getTradePnl(trade) ?? 0;
+    const current = byDate.get(date) ?? { pnl: 0, count: 0 };
+    byDate.set(date, { pnl: current.pnl + pnl, count: current.count + 1 });
+  }
+
+  return Array.from(byDate.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, { pnl, count }]) => ({ date, pnl, tradeCount: count }));
+}
+
 export function getCumulativePnlSeries(trades: StoredTrade[]) {
   const closedTrades = trades
     .filter(isClosedTrade)

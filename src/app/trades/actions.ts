@@ -1,8 +1,16 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
+
+function revalidateTradePages() {
+  revalidatePath("/dashboard");
+  revalidatePath("/journal");
+  revalidatePath("/analytics");
+  revalidatePath("/playbook");
+}
 
 function buildNewTradeRedirect(message: string) {
   return `/trades/new?message=${encodeURIComponent(message)}`;
@@ -221,6 +229,8 @@ export async function createTrade(formData: FormData) {
     fail("new", error.message);
   }
 
+  revalidateTradePages();
+
   if (intent === "add-another") {
     redirect("/trades/new?saved=1");
   }
@@ -249,6 +259,7 @@ export async function updateTrade(formData: FormData) {
     fail({ tradeId }, error?.message ?? "Unable to update this trade.");
   }
 
+  revalidateTradePages();
   redirect("/dashboard?updated=1");
 }
 
@@ -269,5 +280,6 @@ export async function deleteTrade(formData: FormData) {
     redirect(`/dashboard?message=${encodeURIComponent(error.message)}`);
   }
 
+  revalidateTradePages();
   redirect("/dashboard?deleted=1");
 }

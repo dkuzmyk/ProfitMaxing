@@ -1,12 +1,23 @@
+import Link from "next/link";
+
 import { DashboardRangePicker } from "@/components/dashboard-range-picker";
+import { PnlDistributionChart } from "@/components/pnl-distribution";
+import { TimeHeatmap } from "@/components/time-heatmap";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import { getDemoInsightTrades } from "@/lib/demo-insights";
 import { formatCurrency, formatPercent } from "@/lib/demo-data";
 import {
+  getDirectionPerformance,
+  getDrawdownStats,
   getGradePerformance,
+  getHoldingTimeBuckets,
   getMistakePerformance,
+  getProfitFactorStats,
   getReviewSummary,
   getSetupPerformance,
+  getSymbolPerformance,
+  getTagPerformance,
+  getTimeHeatmap,
 } from "@/lib/journal-insights";
 import { getTradeRangeLabel, normalizeTradeRange } from "@/lib/trade-metrics";
 
@@ -21,6 +32,36 @@ const rangeOptions = [
   { value: "all", label: "All" },
 ] as const;
 
+function pnlColor(value: number) {
+  return value > 0 ? "text-emerald-400" : value < 0 ? "text-rose-400" : "text-[#b5bac1]";
+}
+
+function winRateColor(rate: number) {
+  return rate >= 0.55
+    ? "text-emerald-400"
+    : rate >= 0.4
+      ? "text-[#b5bac1]"
+      : "text-rose-400";
+}
+
+function InlineBar({ value, maxAbs }: { value: number; maxAbs: number }) {
+  const pct = maxAbs > 0 ? Math.min(100, (Math.abs(value) / maxAbs) * 100) : 0;
+  return (
+    <div className="flex h-1.5 w-full items-center overflow-hidden rounded-full bg-white/6">
+      <div
+        className={`h-full rounded-full ${value >= 0 ? "bg-emerald-400" : "bg-rose-400"}`}
+        style={{ width: `${pct}%`, opacity: 0.75 }}
+      />
+    </div>
+  );
+}
+
+function formatHoldTime(minutes: number) {
+  if (minutes < 60) return `${Math.round(minutes)}m`;
+  if (minutes < 1440) return `${(minutes / 60).toFixed(1)}h`;
+  return `${Math.round(minutes / 1440)}d`;
+}
+
 export default async function DemoAnalyticsPage({
   searchParams,
 }: {
@@ -29,228 +70,581 @@ export default async function DemoAnalyticsPage({
   const { range } = await searchParams;
   const selectedRange = normalizeTradeRange(range);
   const trades = getDemoInsightTrades(selectedRange);
-  const setupPerformance = getSetupPerformance(trades);
-  const mistakePerformance = getMistakePerformance(trades);
+  const closedTrades = trades.filter((t) => t.closedAt != null);
+
+  const totalPnl = closedTrades.reduce((sum, t) => sum + t.realizedPnl, 0);
+  const winRate = closedTrades.length
+    ? closedTrades.filter((t) => t.realizedPnl > 0).length / closedTrades.length
+    : 0;
+  const closedPnls = closedTrades.map((t) => t.realizedPnl);
+
   const reviewSummary = getReviewSummary(trades);
+  const profitFactor = getProfitFactorStats(trades);
+  const drawdown = getDrawdownStats(trades);
+  const setupPerformance = getSetupPerformance(trades);
+  const symbolPerformance = getSymbolPerformance(trades);
+  const tagPerformance = getTagPerformance(trades);
+  const mistakePerformance = getMistakePerformance(trades);
   const gradePerformance = getGradePerformance(trades);
+  const directionPerformance = getDirectionPerformance(trades);
+  const holdingTime = getHoldingTimeBuckets(trades);
+  const heatmapData = getTimeHeatmap(trades);
+
+  const maxSetupPnl = Math.max(...setupPerformance.map((s) => Math.abs(s.totalPnl)), 1);
+  const maxSymPnl = Math.max(...symbolPerformance.map((s) => Math.abs(s.totalPnl)), 1);
+  const maxTagPnl = Math.max(...tagPerformance.map((t) => Math.abs(t.totalPnl)), 1);
+
+  const edgeRows: { label: string; value: string; cls: string }[] = [
+    {
+      label: "Profit Factor",
+      value:
+        profitFactor.grossLoss > 0
+          ? profitFactor.profitFactor.toFixed(2)
+          : profitFactor.grossProfit > 0
+            ? "∞"
+            : "--",
+      cls:
+        profitFactor.profitFactor >= 1.5
+          ? "text-emerald-400"
+          : profitFactor.profitFactor >= 1
+            ? "text-[#b5bac1]"
+            : "text-rose-400",
+    },
+    {
+      label: "W / L Ratio",
+      value: profitFactor.avgLoss > 0 ? `${profitFactor.winLossRatio.toFixed(2)}×` : "--",
+      cls: profitFactor.winLossRatio >= 1 ? "text-emerald-400" : "text-rose-400",
+    },
+    {
+      label: "Avg Win",
+      value: profitFactor.avgWin > 0 ? formatCurrency(profitFactor.avgWin) : "--",
+      cls: "text-emerald-400",
+    },
+    {
+      label: "Avg Loss",
+      value: profitFactor.avgLoss > 0 ? formatCurrency(-profitFactor.avgLoss) : "--",
+      cls: "text-rose-400",
+    },
+    {
+      label: "Peak Equity",
+      value: drawdown.peak > 0 ? formatCurrency(drawdown.peak) : "--",
+      cls: "text-white",
+    },
+    {
+      label: "Max Drawdown",
+      value:
+        drawdown.maxDrawdown > 0
+          ? `${formatCurrency(-drawdown.maxDrawdown)} (${formatPercent(drawdown.maxDrawdownPercent)})`
+          : "--",
+      cls: drawdown.maxDrawdown > 0 ? "text-rose-400" : "text-[#b5bac1]",
+    },
+    ...(profitFactor.bestTrade
+      ? [{ label: `Best (${profitFactor.bestTrade.symbol})`, value: formatCurrency(profitFactor.bestTrade.pnl), cls: "text-emerald-400" }]
+      : []),
+    ...(profitFactor.worstTrade
+      ? [{ label: `Worst (${profitFactor.worstTrade.symbol})`, value: formatCurrency(profitFactor.worstTrade.pnl), cls: "text-rose-400" }]
+      : []),
+  ];
+
+  const [longDir, shortDir] = directionPerformance;
+  const dirRows = [
+    {
+      label: "Trades",
+      long: { v: String(longDir.totalTrades), cls: "text-[#b5bac1]" },
+      short: { v: String(shortDir.totalTrades), cls: "text-[#b5bac1]" },
+    },
+    {
+      label: "Win Rate",
+      long: { v: longDir.closedTrades ? formatPercent(longDir.winRate) : "--", cls: winRateColor(longDir.winRate) },
+      short: { v: shortDir.closedTrades ? formatPercent(shortDir.winRate) : "--", cls: winRateColor(shortDir.winRate) },
+    },
+    {
+      label: "Total P&L",
+      long: { v: longDir.closedTrades ? formatCurrency(longDir.totalPnl) : "--", cls: pnlColor(longDir.totalPnl) },
+      short: { v: shortDir.closedTrades ? formatCurrency(shortDir.totalPnl) : "--", cls: pnlColor(shortDir.totalPnl) },
+    },
+    {
+      label: "Avg P&L",
+      long: { v: longDir.closedTrades ? formatCurrency(longDir.avgPnl) : "--", cls: pnlColor(longDir.avgPnl) },
+      short: { v: shortDir.closedTrades ? formatCurrency(shortDir.avgPnl) : "--", cls: pnlColor(shortDir.avgPnl) },
+    },
+  ];
 
   return (
-    <main className="px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
+    <main className="px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
         <WorkspaceTabs variant="demo" />
 
-        <header className="flex flex-col gap-4 rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)] md:flex-row md:items-start md:justify-between">
+        {/* ── Header ── */}
+        <header className="flex flex-col gap-3 rounded-[28px] border border-white/8 bg-[#2b2d31] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.3)] md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.22em] text-[#949ba4]">
+            <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-[#949ba4]">
               Demo Analytics
             </p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+            <h1 className="mt-1 text-xl font-semibold tracking-tight text-white">
               Explore setup and review analytics
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#b5bac1]">
-              Synthetic data only. {getTradeRangeLabel(selectedRange)}.
+            <p className="mt-0.5 text-xs text-[#b5bac1]">
+              Synthetic data only · {getTradeRangeLabel(selectedRange)}
             </p>
           </div>
-
-          <div className="flex flex-wrap items-end gap-3">
-            <DashboardRangePicker
-              options={rangeOptions}
-              selectedRange={selectedRange}
-            />
-          </div>
+          <DashboardRangePicker options={rangeOptions} selectedRange={selectedRange} />
         </header>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[24px] border border-white/8 bg-[#2b2d31] p-6">
-            <p className="text-sm uppercase tracking-[0.2em] text-[#949ba4]">
-              Reviewed Trades
-            </p>
-            <p className="mt-3 text-3xl font-semibold text-white">
-              {reviewSummary.reviewedTrades}
-            </p>
+        {/* ── Stats Strip ── */}
+        <section className="overflow-hidden rounded-[28px] border border-white/8 bg-[#2b2d31]">
+          <div className="flex overflow-x-auto divide-x divide-white/8">
+            {[
+              { label: "Total P&L", value: formatCurrency(totalPnl), cls: pnlColor(totalPnl) },
+              {
+                label: "Win Rate",
+                value: closedTrades.length ? formatPercent(winRate) : "--",
+                cls: winRateColor(winRate),
+              },
+              {
+                label: "Profit Factor",
+                value:
+                  profitFactor.grossLoss > 0
+                    ? profitFactor.profitFactor.toFixed(2)
+                    : profitFactor.grossProfit > 0
+                      ? "∞"
+                      : "--",
+                cls:
+                  profitFactor.profitFactor >= 1.5
+                    ? "text-emerald-400"
+                    : profitFactor.profitFactor >= 1
+                      ? "text-[#b5bac1]"
+                      : "text-rose-400",
+              },
+              {
+                label: "W / L Ratio",
+                value: profitFactor.avgLoss > 0 ? `${profitFactor.winLossRatio.toFixed(2)}×` : "--",
+                cls: profitFactor.winLossRatio >= 1 ? "text-emerald-400" : "text-rose-400",
+              },
+              {
+                label: "Avg Hold",
+                value: holdingTime.avgHoldMinutes > 0 ? formatHoldTime(holdingTime.avgHoldMinutes) : "--",
+                cls: "text-white",
+              },
+              {
+                label: "Max DD",
+                value: drawdown.maxDrawdown > 0 ? `−${formatPercent(drawdown.maxDrawdownPercent)}` : "--",
+                cls: drawdown.maxDrawdown > 0 ? "text-rose-400" : "text-[#b5bac1]",
+              },
+            ].map(({ label, value, cls }) => (
+              <div key={label} className="flex min-w-[120px] flex-1 flex-col gap-1 px-5 py-4">
+                <p className="whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
+                  {label}
+                </p>
+                <p className={`text-xl font-semibold tabular-nums ${cls}`}>{value}</p>
+              </div>
+            ))}
           </div>
-          <div className="rounded-[24px] border border-white/8 bg-[#2b2d31] p-6">
-            <p className="text-sm uppercase tracking-[0.2em] text-[#949ba4]">
-              Avg Confidence
-            </p>
-            <p className="mt-3 text-3xl font-semibold text-white">
-              {reviewSummary.avgConfidence
-                ? `${reviewSummary.avgConfidence.toFixed(1)}/5`
-                : "--"}
-            </p>
-          </div>
-          <div className="rounded-[24px] border border-white/8 bg-[#2b2d31] p-6">
-            <p className="text-sm uppercase tracking-[0.2em] text-[#949ba4]">
-              Grade A / B
-            </p>
-            <p className="mt-3 text-3xl font-semibold text-white">
-              {reviewSummary.gradeCounts.A + reviewSummary.gradeCounts.B}
-            </p>
-          </div>
-          <div className="rounded-[24px] border border-white/8 bg-[#2b2d31] p-6">
-            <p className="text-sm uppercase tracking-[0.2em] text-[#949ba4]">
-              Followed Plan
-            </p>
-            <p className="mt-3 text-3xl font-semibold text-white">
-              {formatPercent(reviewSummary.followedPlanRate)}
-            </p>
+
+          {/* Secondary context bar */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-white/8 bg-[#1e1f22]/60 px-5 py-2">
+            <span className="text-[11px] text-[#949ba4]">
+              Reviewed <span className="text-white">{reviewSummary.reviewedTrades}</span>
+            </span>
+            <span className="select-none text-white/20">·</span>
+            <span className="text-[11px] text-[#949ba4]">
+              Grade A/B{" "}
+              <span className="text-white">
+                {reviewSummary.gradeCounts.A + reviewSummary.gradeCounts.B}
+              </span>
+            </span>
+            <span className="select-none text-white/20">·</span>
+            <span className="text-[11px] text-[#949ba4]">
+              Followed Plan{" "}
+              <span className="text-white">{formatPercent(reviewSummary.followedPlanRate)}</span>
+            </span>
+            {reviewSummary.avgConfidence > 0 && (
+              <>
+                <span className="select-none text-white/20">·</span>
+                <span className="text-[11px] text-[#949ba4]">
+                  Conf <span className="text-white">{reviewSummary.avgConfidence.toFixed(1)}/5</span>
+                </span>
+              </>
+            )}
+            {profitFactor.grossProfit > 0 && (
+              <>
+                <span className="select-none text-white/20">·</span>
+                <span className="text-[11px] text-[#949ba4]">
+                  Gross{" "}
+                  <span className="text-emerald-400">{formatCurrency(profitFactor.grossProfit)}</span>
+                  {" / "}
+                  <span className="text-rose-400">{formatCurrency(-profitFactor.grossLoss)}</span>
+                </span>
+              </>
+            )}
+            {(drawdown.maxWinStreak > 0 || drawdown.maxLossStreak > 0) && (
+              <>
+                <span className="select-none text-white/20">·</span>
+                <span className="text-[11px] text-[#949ba4]">
+                  Streak{" "}
+                  <span className="text-emerald-400">{drawdown.maxWinStreak}W</span>
+                  {" / "}
+                  <span className="text-rose-400">{drawdown.maxLossStreak}L</span>
+                </span>
+              </>
+            )}
           </div>
         </section>
 
-        <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6">
-            <p className="text-sm uppercase tracking-[0.2em] text-[#949ba4]">
+        {/* ── P&L Distribution ── */}
+        <section className="rounded-[28px] border border-white/8 bg-[#2b2d31] px-5 pb-5 pt-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
+              P&amp;L Distribution
+            </p>
+            <p className="text-[11px] text-[#6d7278]">{closedTrades.length} closed trades</p>
+          </div>
+          <div className="mt-3">
+            <PnlDistributionChart values={closedPnls} />
+          </div>
+        </section>
+
+        {/* ── Setup + Edge/Risk panel ── */}
+        <section className="grid gap-3 xl:grid-cols-[1.35fr_0.65fr]">
+          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
+            <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
               Setup Ranking
             </p>
-            <div className="mt-5 overflow-hidden rounded-[24px] border border-white/8">
-              <table className="min-w-full divide-y divide-white/8">
-                <thead className="bg-[#1e1f22] text-left text-[11px] uppercase tracking-[0.16em] text-[#949ba4]">
-                  <tr>
-                    <th className="px-3 py-2.5">Setup</th>
-                    <th className="px-3 py-2.5">Trades</th>
-                    <th className="px-3 py-2.5">Win Rate</th>
-                    <th className="px-3 py-2.5">Total P&amp;L</th>
-                    <th className="px-3 py-2.5">Avg P&amp;L</th>
-                    <th className="px-3 py-2.5">Return</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/6 text-[13px]">
-                  {setupPerformance.slice(0, 8).map((setup) => (
-                    <tr key={setup.setup}>
-                      <td className="px-3 py-3 font-medium text-white">
-                        {setup.setup}
-                      </td>
-                      <td className="px-3 py-3 text-[#b5bac1]">{setup.totalTrades}</td>
-                      <td className="px-3 py-3 text-[#b5bac1]">
-                        {formatPercent(setup.winRate)}
-                      </td>
-                      <td className="px-3 py-3 text-white">
-                        {formatCurrency(setup.totalPnl)}
-                      </td>
-                      <td className="px-3 py-3 text-[#b5bac1]">
-                        {formatCurrency(setup.avgPnl)}
-                      </td>
-                      <td className="px-3 py-3 text-[#b5bac1]">
-                        {formatPercent(setup.returnPercent)}
-                      </td>
+            <div className="overflow-hidden rounded-[20px] border border-white/8">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-white/8">
+                  <thead className="bg-[#1e1f22] text-left text-[10px] uppercase tracking-[0.16em] text-[#949ba4]">
+                    <tr>
+                      <th className="px-3 py-2">Setup</th>
+                      <th className="px-3 py-2">#</th>
+                      <th className="px-3 py-2">Win%</th>
+                      <th className="px-3 py-2">P&amp;L</th>
+                      <th className="w-[72px] px-3 py-2"></th>
+                      <th className="px-3 py-2">Avg</th>
+                      <th className="px-3 py-2">Ret%</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-white/6 text-[12px]">
+                    {setupPerformance.slice(0, 10).map((setup) => (
+                      <tr key={setup.setup} className="transition hover:bg-white/[0.02]">
+                        <td className="px-3 py-2 font-medium text-white">{setup.setup}</td>
+                        <td className="px-3 py-2 text-[#b5bac1]">{setup.totalTrades}</td>
+                        <td className={`px-3 py-2 font-medium ${winRateColor(setup.winRate)}`}>
+                          {formatPercent(setup.winRate)}
+                        </td>
+                        <td className={`px-3 py-2 font-medium ${pnlColor(setup.totalPnl)}`}>
+                          {formatCurrency(setup.totalPnl)}
+                        </td>
+                        <td className="w-[72px] px-3 py-2">
+                          <InlineBar value={setup.totalPnl} maxAbs={maxSetupPnl} />
+                        </td>
+                        <td className={`px-3 py-2 ${pnlColor(setup.avgPnl)}`}>
+                          {formatCurrency(setup.avgPnl)}
+                        </td>
+                        <td className={`px-3 py-2 ${pnlColor(setup.returnPercent)}`}>
+                          {formatPercent(setup.returnPercent)}
+                        </td>
+                      </tr>
+                    ))}
+                    {setupPerformance.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="px-3 py-4 text-[12px] text-[#b5bac1]">
+                          No setup data in this range yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6">
-            <p className="text-sm uppercase tracking-[0.2em] text-[#949ba4]">
-              Mistake Cost
-            </p>
-            <div className="mt-5 grid gap-4">
-              {mistakePerformance.slice(0, 6).map((mistake) => (
-                <div
-                  key={mistake.label}
-                  className="rounded-[24px] bg-[#1e1f22] p-4"
-                >
-                  <p className="text-sm font-medium text-white">{mistake.label}</p>
-                  <p className="mt-2 text-xl font-semibold text-rose-400">
-                    {formatCurrency(mistake.totalPnl)}
-                  </p>
-                  <p className="mt-2 text-sm text-[#949ba4]">
-                    {mistake.count} trade{mistake.count === 1 ? "" : "s"} · avg{" "}
-                    {formatCurrency(mistake.avgPnl)} · return{" "}
-                    {formatPercent(mistake.returnPercent)}
-                  </p>
+          {/* Edge/Risk + Mistake Cost */}
+          <div className="flex flex-col gap-3">
+            <div className="rounded-[24px] border border-white/8 bg-[#2b2d31] p-4">
+              <p className="mb-2.5 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
+                Edge &amp; Risk
+              </p>
+              <dl className="overflow-hidden rounded-[16px] bg-[#1e1f22] divide-y divide-white/6">
+                {edgeRows.map(({ label, value, cls }) => (
+                  <div key={label} className="flex items-center justify-between px-4 py-2">
+                    <dt className="text-[11px] text-[#6d7278]">{label}</dt>
+                    <dd className={`text-[12px] font-medium tabular-nums ${cls}`}>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+
+            {mistakePerformance.length > 0 && (
+              <div className="rounded-[24px] border border-white/8 bg-[#2b2d31] p-4">
+                <p className="mb-2.5 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
+                  Mistake Cost
+                </p>
+                <div className="space-y-1">
+                  {mistakePerformance.slice(0, 5).map((m) => (
+                    <div
+                      key={m.label}
+                      className="flex items-center justify-between rounded-xl bg-[#1e1f22] px-3 py-2"
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-[12px] font-medium text-white">
+                          {m.label}
+                        </span>
+                        <span className="shrink-0 text-[10px] text-[#6d7278]">{m.count}×</span>
+                      </div>
+                      <span className="shrink-0 text-[12px] font-medium tabular-nums text-rose-400">
+                        {formatCurrency(m.totalPnl)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ── Symbol Performance ── */}
+        {symbolPerformance.length > 0 && (
+          <section className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
+            <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
+              Symbol Performance
+            </p>
+            <div className="overflow-hidden rounded-[20px] border border-white/8">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-white/8">
+                  <thead className="bg-[#1e1f22] text-left text-[10px] uppercase tracking-[0.16em] text-[#949ba4]">
+                    <tr>
+                      <th className="px-3 py-2">Symbol</th>
+                      <th className="px-3 py-2">#</th>
+                      <th className="px-3 py-2">Cl</th>
+                      <th className="px-3 py-2">Win%</th>
+                      <th className="px-3 py-2">P&amp;L</th>
+                      <th className="w-[72px] px-3 py-2"></th>
+                      <th className="px-3 py-2">Avg</th>
+                      <th className="px-3 py-2">Ret%</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/6 text-[12px]">
+                    {symbolPerformance.slice(0, 12).map((sym) => (
+                      <tr key={sym.symbol} className="transition hover:bg-white/[0.02]">
+                        <td className="px-3 py-2 font-medium text-white">{sym.symbol}</td>
+                        <td className="px-3 py-2 text-[#b5bac1]">{sym.totalTrades}</td>
+                        <td className="px-3 py-2 text-[#b5bac1]">{sym.closedTrades}</td>
+                        <td className={`px-3 py-2 font-medium ${winRateColor(sym.winRate)}`}>
+                          {sym.closedTrades ? formatPercent(sym.winRate) : "--"}
+                        </td>
+                        <td className={`px-3 py-2 font-medium ${pnlColor(sym.totalPnl)}`}>
+                          {sym.closedTrades ? formatCurrency(sym.totalPnl) : "--"}
+                        </td>
+                        <td className="w-[72px] px-3 py-2">
+                          {sym.closedTrades ? (
+                            <InlineBar value={sym.totalPnl} maxAbs={maxSymPnl} />
+                          ) : null}
+                        </td>
+                        <td className={`px-3 py-2 ${pnlColor(sym.avgPnl)}`}>
+                          {sym.closedTrades ? formatCurrency(sym.avgPnl) : "--"}
+                        </td>
+                        <td className={`px-3 py-2 ${pnlColor(sym.returnPercent)}`}>
+                          {sym.closedTrades ? formatPercent(sym.returnPercent) : "--"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ── Tag + Grade/Direction ── */}
+        <section className={`grid gap-3 ${tagPerformance.length > 0 ? "xl:grid-cols-[1.1fr_0.9fr]" : ""}`}>
+          {tagPerformance.length > 0 && (
+            <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
+              <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
+                Tag Performance
+              </p>
+              <div className="overflow-hidden rounded-[20px] border border-white/8">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-white/8">
+                    <thead className="bg-[#1e1f22] text-left text-[10px] uppercase tracking-[0.16em] text-[#949ba4]">
+                      <tr>
+                        <th className="px-3 py-2">Tag</th>
+                        <th className="px-3 py-2">#</th>
+                        <th className="px-3 py-2">Cl</th>
+                        <th className="px-3 py-2">Win%</th>
+                        <th className="px-3 py-2">P&amp;L</th>
+                        <th className="w-[72px] px-3 py-2"></th>
+                        <th className="px-3 py-2">Avg</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/6 text-[12px]">
+                      {tagPerformance.slice(0, 12).map((row) => (
+                        <tr key={row.tag} className="transition hover:bg-white/[0.02]">
+                          <td className="px-3 py-2 font-medium text-white">{row.tag}</td>
+                          <td className="px-3 py-2 text-[#b5bac1]">{row.totalTrades}</td>
+                          <td className="px-3 py-2 text-[#b5bac1]">{row.closedTrades}</td>
+                          <td className={`px-3 py-2 font-medium ${winRateColor(row.winRate)}`}>
+                            {row.closedTrades ? formatPercent(row.winRate) : "--"}
+                          </td>
+                          <td className={`px-3 py-2 font-medium ${pnlColor(row.totalPnl)}`}>
+                            {row.closedTrades ? formatCurrency(row.totalPnl) : "--"}
+                          </td>
+                          <td className="w-[72px] px-3 py-2">
+                            {row.closedTrades ? (
+                              <InlineBar value={row.totalPnl} maxAbs={maxTagPnl} />
+                            ) : null}
+                          </td>
+                          <td className={`px-3 py-2 ${pnlColor(row.avgPnl)}`}>
+                            {row.closedTrades ? formatCurrency(row.avgPnl) : "--"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Grade + Long/Short merged */}
+          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
+            <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
+              Grade Performance
+            </p>
+            <div className="overflow-hidden rounded-[20px] border border-white/8">
+              <table className="min-w-full divide-y divide-white/8">
+                <thead className="bg-[#1e1f22] text-left text-[10px] uppercase tracking-[0.16em] text-[#949ba4]">
+                  <tr>
+                    <th className="px-3 py-2">Grade</th>
+                    <th className="px-3 py-2">#</th>
+                    <th className="px-3 py-2">Conf</th>
+                    <th className="px-3 py-2">P&amp;L</th>
+                    <th className="px-3 py-2">Avg</th>
+                    <th className="px-3 py-2">Ret%</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/6 text-[12px]">
+                  {gradePerformance.map((g) => (
+                    <tr key={g.grade} className="transition hover:bg-white/[0.02]">
+                      <td className="px-3 py-2 font-semibold text-white">{g.grade}</td>
+                      <td className="px-3 py-2 text-[#b5bac1]">{g.count}</td>
+                      <td className="px-3 py-2 text-[#b5bac1]">
+                        {g.avgConfidence ? g.avgConfidence.toFixed(1) : "--"}
+                      </td>
+                      <td className={`px-3 py-2 font-medium ${pnlColor(g.totalPnl)}`}>
+                        {formatCurrency(g.totalPnl)}
+                      </td>
+                      <td className={`px-3 py-2 ${pnlColor(g.avgPnl)}`}>
+                        {formatCurrency(g.avgPnl)}
+                      </td>
+                      <td className={`px-3 py-2 ${pnlColor(g.returnPercent)}`}>
+                        {formatPercent(g.returnPercent)}
+                      </td>
+                    </tr>
+                  ))}
+                  {gradePerformance.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-3 text-[12px] text-[#b5bac1]">
+                        No graded trades yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-4 border-t border-white/8 pt-4">
+              <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
+                Long vs Short
+              </p>
+              <div className="overflow-hidden rounded-[20px] border border-white/8">
+                <table className="min-w-full divide-y divide-white/8 text-[12px]">
+                  <thead className="bg-[#1e1f22] text-[10px] uppercase tracking-[0.16em]">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-[#949ba4]"></th>
+                      <th className="px-3 py-2 text-right font-medium text-emerald-400/80">Long</th>
+                      <th className="px-3 py-2 text-right font-medium text-rose-400/80">Short</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/6">
+                    {dirRows.map(({ label, long, short }) => (
+                      <tr key={label} className="transition hover:bg-white/[0.02]">
+                        <td className="px-3 py-2 text-[11px] text-[#6d7278]">{label}</td>
+                        <td className={`px-3 py-2 text-right font-medium tabular-nums ${long.cls}`}>
+                          {long.v}
+                        </td>
+                        <td className={`px-3 py-2 text-right font-medium tabular-nums ${short.cls}`}>
+                          {short.v}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6">
-            <p className="text-sm uppercase tracking-[0.2em] text-[#949ba4]">
-              Review Grade Performance
-            </p>
-            <div className="mt-5 overflow-hidden rounded-[24px] border border-white/8">
+        {/* ── Holding Time + Time Heatmap ── */}
+        <section className="grid gap-3 xl:grid-cols-[0.85fr_1.15fr]">
+          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
+                Holding Time
+              </p>
+              {holdingTime.avgHoldMinutes > 0 && (
+                <p className="text-[11px] text-[#6d7278]">
+                  avg {formatHoldTime(holdingTime.avgHoldMinutes)}
+                </p>
+              )}
+            </div>
+            <div className="overflow-hidden rounded-[20px] border border-white/8">
               <table className="min-w-full divide-y divide-white/8">
-                <thead className="bg-[#1e1f22] text-left text-[11px] uppercase tracking-[0.16em] text-[#949ba4]">
+                <thead className="bg-[#1e1f22] text-left text-[10px] uppercase tracking-[0.16em] text-[#949ba4]">
                   <tr>
-                    <th className="px-3 py-2.5">Grade</th>
-                    <th className="px-3 py-2.5">Trades</th>
-                    <th className="px-3 py-2.5">Avg Confidence</th>
-                    <th className="px-3 py-2.5">Avg P&amp;L</th>
-                    <th className="px-3 py-2.5">Return</th>
+                    <th className="px-3 py-2">Duration</th>
+                    <th className="px-3 py-2">#</th>
+                    <th className="px-3 py-2">Win%</th>
+                    <th className="px-3 py-2">P&amp;L</th>
+                    <th className="px-3 py-2">Avg</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/6 text-[13px]">
-                  {gradePerformance.map((grade) => (
-                    <tr key={grade.grade}>
-                      <td className="px-3 py-3 font-medium text-white">
-                        {grade.grade}
+                <tbody className="divide-y divide-white/6 text-[12px]">
+                  {holdingTime.buckets.map((b) => (
+                    <tr key={b.label} className="transition hover:bg-white/[0.02]">
+                      <td className="px-3 py-2 font-medium text-white">{b.label}</td>
+                      <td className="px-3 py-2 text-[#b5bac1]">{b.count}</td>
+                      <td className={`px-3 py-2 font-medium ${winRateColor(b.winRate)}`}>
+                        {formatPercent(b.winRate)}
                       </td>
-                      <td className="px-3 py-3 text-[#b5bac1]">{grade.count}</td>
-                      <td className="px-3 py-3 text-[#b5bac1]">
-                        {grade.avgConfidence
-                          ? `${grade.avgConfidence.toFixed(1)}/5`
-                          : "--"}
+                      <td className={`px-3 py-2 font-medium ${pnlColor(b.totalPnl)}`}>
+                        {formatCurrency(b.totalPnl)}
                       </td>
-                      <td className="px-3 py-3 text-white">
-                        {formatCurrency(grade.avgPnl)}
-                      </td>
-                      <td className="px-3 py-3 text-[#b5bac1]">
-                        {formatPercent(grade.returnPercent)}
+                      <td className={`px-3 py-2 ${pnlColor(b.avgPnl)}`}>
+                        {formatCurrency(b.avgPnl)}
                       </td>
                     </tr>
                   ))}
+                  {holdingTime.buckets.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-4 text-[12px] text-[#b5bac1]">
+                        No closed trades yet.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6">
-            <p className="text-sm uppercase tracking-[0.2em] text-[#949ba4]">
-              Review Signals
-            </p>
-            <div className="mt-5 grid gap-4">
-              <div className="rounded-[24px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  Top Setup
-                </p>
-                <p className="mt-2 text-xl font-semibold text-white">
-                  {setupPerformance[0]?.setup ?? "None yet"}
-                </p>
-                <p className="mt-2 text-sm text-emerald-400">
-                  {setupPerformance[0]
-                    ? `${formatCurrency(setupPerformance[0].totalPnl)} across ${setupPerformance[0].totalTrades} trades`
-                    : "Synthetic setup ranking will appear here."}
-                </p>
-              </div>
-              <div className="rounded-[24px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  Weakest Reviewed Grade
-                </p>
-                <p className="mt-2 text-xl font-semibold text-white">
-                  {gradePerformance.at(-1)?.grade ?? "No graded trades"}
-                </p>
-                <p className="mt-2 text-sm text-rose-400">
-                  {gradePerformance.at(-1)
-                    ? `${formatCurrency(gradePerformance.at(-1)!.avgPnl)} average P&L`
-                    : "Synthetic grades will populate here."}
-                </p>
-              </div>
-              <div className="rounded-[24px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  Costliest Mistake
-                </p>
-                <p className="mt-2 text-xl font-semibold text-white">
-                  {mistakePerformance[0]?.label ?? "No mistake tags yet"}
-                </p>
-                <p className="mt-2 text-sm text-rose-400">
-                  {mistakePerformance[0]
-                    ? formatCurrency(mistakePerformance[0].totalPnl)
-                    : "Synthetic mistake data will populate here."}
-                </p>
-              </div>
+          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
+                Time of Day
+              </p>
+              <p className="text-[11px] text-[#6d7278]">avg P&amp;L by open hour</p>
             </div>
+            <TimeHeatmap data={heatmapData} />
           </div>
         </section>
       </div>

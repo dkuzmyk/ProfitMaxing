@@ -2,18 +2,20 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { CumulativePnlChart } from "@/components/cumulative-pnl-chart";
+import { DailyPnlBars } from "@/components/daily-pnl-bars";
 import { DashboardRangePicker } from "@/components/dashboard-range-picker";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import { formatCurrency, formatDateTime, formatPercent } from "@/lib/demo-data";
 import { createClient } from "@/lib/supabase/server";
 import { deleteTrade } from "@/app/trades/actions";
 import {
-  filterTradesByRange,
   getCumulativePnlSeries,
+  getDailyPnlSeries,
   getTradeMarketValue,
   getStoredTradeMetrics,
   getTradePnl,
   getTradePnlPercent,
+  getTradeRangeCutoff,
   getTradeRangeLabel,
   normalizeTradeRange,
 } from "@/lib/trade-metrics";
@@ -88,20 +90,31 @@ export default async function DashboardPage({
     redirect("/login?message=Please sign in to view your dashboard.");
   }
 
-  const { data: trades, error: tradesError } = await supabase
+  const { range, created, updated, deleted, message } = await searchParams;
+  const selectedRange = normalizeTradeRange(range);
+  const rangeCutoff = getTradeRangeCutoff(selectedRange);
+  const rangeCutoffDate = rangeCutoff?.toISOString().slice(0, 10);
+
+  let tradesQuery = supabase
     .from("trades")
     .select(
       "id, symbol, setup, direction, entry_price, exit_price, quantity, opened_at, closed_at, status, followed_plan, confidence_rating, grade, tags, mistake_tags",
     )
+    .order("trade_date", { ascending: false })
     .order("opened_at", { ascending: false });
 
+  if (rangeCutoffDate) {
+    tradesQuery = tradesQuery.gte("trade_date", rangeCutoffDate);
+  }
+
+  const { data: trades, error: tradesError } = await tradesQuery;
+
   const hasDataError = tradesError;
-  const { range, created, updated, deleted, message } = await searchParams;
-  const selectedRange = normalizeTradeRange(range);
-  const filteredTrades = trades ? filterTradesByRange(trades, selectedRange) : [];
-  const metrics = filteredTrades ? getStoredTradeMetrics(filteredTrades) : null;
-  const cumulativeSeries = getCumulativePnlSeries(filteredTrades);
-  const recentTrades = filteredTrades.slice(0, 6);
+  const allTrades = trades ?? [];
+  const metrics = getStoredTradeMetrics(allTrades);
+  const cumulativeSeries = getCumulativePnlSeries(allTrades);
+  const dailySeries = getDailyPnlSeries(allTrades);
+  const recentTrades = allTrades.slice(0, 6);
 
   return (
     <main className="px-4 py-8 sm:px-6 lg:px-8">
@@ -133,13 +146,12 @@ export default async function DashboardPage({
             >
               Add trade
             </Link>
-            <button
-              type="button"
-              disabled
-              className="rounded-[22px] border border-white/10 bg-[#1e1f22] px-4 py-3 text-sm font-medium text-[#6d7278]"
+            <Link
+              href="/trades/import"
+              className="rounded-[22px] border border-white/10 bg-[#1e1f22] px-4 py-3 text-center text-sm font-medium text-[#dbdee1] transition hover:border-[#5865f2]/40 hover:text-white"
             >
-              CSV import soon
-            </button>
+              CSV import
+            </Link>
             <button
               type="button"
               disabled
@@ -184,16 +196,20 @@ export default async function DashboardPage({
                 <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
                   Total P&amp;L
                 </p>
-                <p className="mt-2 break-words text-lg font-semibold leading-tight text-white sm:text-xl">
-                  {metrics ? formatCurrency(metrics.totalClosedPnl) : "--"}
+                <p className={`mt-2 break-words text-lg font-semibold leading-tight sm:text-xl ${
+                  metrics.totalClosedPnl > 0 ? "text-emerald-400" : metrics.totalClosedPnl < 0 ? "text-rose-400" : "text-white"
+                }`}>
+                  {formatCurrency(metrics.totalClosedPnl)}
                 </p>
               </div>
               <div className="min-w-0 rounded-[24px] bg-[#1e1f22] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
                   P&amp;L %
                 </p>
-                <p className="mt-2 break-words text-lg font-semibold leading-tight text-white sm:text-xl">
-                  {metrics ? formatPercent(metrics.pnlPercent) : "--"}
+                <p className={`mt-2 break-words text-lg font-semibold leading-tight sm:text-xl ${
+                  metrics.pnlPercent > 0 ? "text-emerald-400" : metrics.pnlPercent < 0 ? "text-rose-400" : "text-white"
+                }`}>
+                  {formatPercent(metrics.pnlPercent)}
                 </p>
               </div>
               <div className="min-w-0 rounded-[24px] bg-[#1e1f22] p-4">
@@ -201,7 +217,7 @@ export default async function DashboardPage({
                   Currently Invested
                 </p>
                 <p className="mt-2 break-words text-lg font-semibold leading-tight text-white sm:text-xl">
-                  {metrics ? formatCurrency(metrics.totalCurrentlyInvested) : "--"}
+                  {formatCurrency(metrics.totalCurrentlyInvested)}
                 </p>
               </div>
               <div className="min-w-0 rounded-[24px] bg-[#1e1f22] p-4">
@@ -209,23 +225,27 @@ export default async function DashboardPage({
                   Total Traded
                 </p>
                 <p className="mt-2 break-words text-lg font-semibold leading-tight text-white sm:text-xl">
-                  {metrics ? formatCurrency(metrics.totalMoneyTraded) : "--"}
+                  {formatCurrency(metrics.totalMoneyTraded)}
                 </p>
               </div>
               <div className="min-w-0 rounded-[24px] bg-[#1e1f22] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
                   Return %
                 </p>
-                <p className="mt-2 break-words text-lg font-semibold leading-tight text-white sm:text-xl">
-                  {metrics ? formatPercent(metrics.returnPercent) : "--"}
+                <p className={`mt-2 break-words text-lg font-semibold leading-tight sm:text-xl ${
+                  metrics.returnPercent > 0 ? "text-emerald-400" : metrics.returnPercent < 0 ? "text-rose-400" : "text-white"
+                }`}>
+                  {formatPercent(metrics.returnPercent)}
                 </p>
               </div>
               <div className="min-w-0 rounded-[24px] bg-[#1e1f22] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
                   Win Rate
                 </p>
-                <p className="mt-2 break-words text-lg font-semibold leading-tight text-white sm:text-xl">
-                  {metrics ? formatPercent(metrics.winRate) : "--"}
+                <p className={`mt-2 break-words text-lg font-semibold leading-tight sm:text-xl ${
+                  metrics.winRate >= 0.55 ? "text-emerald-400" : metrics.winRate >= 0.40 ? "text-white" : metrics.closedTrades > 0 ? "text-rose-400" : "text-white"
+                }`}>
+                  {metrics.closedTrades ? formatPercent(metrics.winRate) : "--"}
                 </p>
               </div>
             </div>
@@ -295,6 +315,20 @@ export default async function DashboardPage({
         </section>
 
         <section className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
+          <div className="flex items-baseline justify-between">
+            <p className="text-sm uppercase tracking-[0.2em] text-[#949ba4]">
+              Daily P&amp;L
+            </p>
+            <p className="text-xs text-[#6d7278]">
+              {dailySeries.length} trading day{dailySeries.length === 1 ? "" : "s"}
+            </p>
+          </div>
+          <div className="mt-4">
+            <DailyPnlBars points={dailySeries} />
+          </div>
+        </section>
+
+        <section className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
           <p className="text-sm uppercase tracking-[0.2em] text-[#949ba4]">
             Range Trades
           </p>
@@ -331,11 +365,14 @@ export default async function DashboardPage({
                     const pnlPercent = getTradePnlPercent(trade);
 
                     return (
-                      <tr key={trade.id}>
+                      <tr key={trade.id} className="transition hover:bg-white/[0.02]">
                         <td className="px-2 py-2.5">
-                          <p className="whitespace-nowrap font-medium text-white">
+                          <Link
+                            href={`/trades/${trade.id}`}
+                            className="whitespace-nowrap font-medium text-white transition hover:text-[#5865f2]"
+                          >
                             {trade.symbol} · {trade.direction}
-                          </p>
+                          </Link>
                         </td>
                         <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
                           {formatDateTime(trade.opened_at)}
@@ -441,7 +478,7 @@ export default async function DashboardPage({
           ) : (
             <div className="mt-4 rounded-2xl border border-white/8 bg-[#1e1f22] px-4 py-4 text-sm leading-7 text-[#b5bac1]">
               <p>
-                {trades && trades.length > 0
+                {allTrades.length > 0
                   ? "No trades match the selected timeframe yet."
                   : "You are authenticated and the table exists, but there are no real trades yet."}
               </p>

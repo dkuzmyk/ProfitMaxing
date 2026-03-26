@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { DashboardRangePicker } from "@/components/dashboard-range-picker";
@@ -208,6 +209,15 @@ export default async function PlaybookPage({
                     </span>
                   ) : null}
                 </div>
+              </div>
+
+              <div className="mt-5 border-t border-white/8 pt-5">
+                <Link
+                  href={`/journal?setup=${encodeURIComponent(entry.setup)}&range=${selectedRange}`}
+                  className="text-sm font-medium text-[#5865f2] transition hover:text-[#4752c4]"
+                >
+                  View trades →
+                </Link>
               </div>
             </article>
           ))}
