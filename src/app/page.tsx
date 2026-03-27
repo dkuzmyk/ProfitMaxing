@@ -1,4 +1,12 @@
 import Link from "next/link";
+import {
+  TrendingUp,
+  Brain,
+  TrendingDown,
+  CalendarDays,
+  Flame,
+  Target,
+} from "lucide-react";
 
 import { signOut } from "@/app/login/actions";
 import { createClient } from "@/lib/supabase/server";
@@ -170,41 +178,55 @@ export default async function Home() {
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[
             {
-              icon: "📈",
+              Icon: TrendingUp,
+              color: "text-emerald-400",
+              bg: "bg-emerald-400/10",
               title: "See your real edge",
               body: "Most traders think they have an edge until they look at their actual numbers. Profit factor, expectancy, win rate by setup — know what's working before you size up.",
             },
             {
-              icon: "🧠",
+              Icon: Brain,
+              color: "text-violet-400",
+              bg: "bg-violet-400/10",
               title: "Grade every decision",
               body: "Log confidence, setup quality, and whether you followed your plan. Over time you'll see if your losses are bad luck or bad habits.",
             },
             {
-              icon: "📉",
+              Icon: TrendingDown,
+              color: "text-rose-400",
+              bg: "bg-rose-400/10",
               title: "Drawdown awareness",
               body: "Real-time drawdown tracking so you know exactly where you are relative to your peak. Stop averaging down blind — see the damage before it compounds.",
             },
             {
-              icon: "📅",
+              Icon: CalendarDays,
+              color: "text-sky-400",
+              bg: "bg-sky-400/10",
               title: "Daily P&L rhythm",
               body: "Bar chart of every trading day so you can spot which days or sessions consistently drain your account. Time your size to your best windows.",
             },
             {
-              icon: "🔥",
+              Icon: Flame,
+              color: "text-orange-400",
+              bg: "bg-orange-400/10",
               title: "Streak tracking",
               body: "Know when you're on a hot streak — or a cold one. Consecutive losses are a sign to step back. Consecutive wins are a sign to stay disciplined.",
             },
             {
-              icon: "🎯",
+              Icon: Target,
+              color: "text-amber-400",
+              bg: "bg-amber-400/10",
               title: "Plan adherence",
               body: "Tag every trade as followed-plan or not. When you break your rules and win, that's the most dangerous outcome. Track it anyway.",
             },
-          ].map(({ icon, title, body }) => (
+          ].map(({ Icon, color, bg, title, body }) => (
             <div
               key={title}
               className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6"
             >
-              <p className="text-2xl">{icon}</p>
+              <span className={`inline-flex rounded-2xl p-2.5 ${bg}`}>
+                <Icon className={`h-5 w-5 ${color}`} strokeWidth={1.75} />
+              </span>
               <h3 className="mt-3 text-base font-semibold text-white">{title}</h3>
               <p className="mt-2 text-sm leading-[1.7] text-[#949ba4]">{body}</p>
             </div>
