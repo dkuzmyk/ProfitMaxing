@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -62,9 +63,14 @@ export function GlobalNav({ userEmail }: { userEmail?: string | null }) {
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
         <div className="min-w-0">
           <Link href="/" className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#5865f2] text-sm font-semibold text-white shadow-[0_12px_24px_rgba(88,101,242,0.35)]">
-              PM
-            </span>
+            <Image
+              src="/logo.png"
+              alt="Profit Maxing"
+              width={60}
+              height={60}
+              className="h-[60px] w-[60px] object-contain"
+              priority
+            />
             <div className="min-w-0">
               <p className="text-sm font-semibold tracking-wide text-white">
                 Profit Maxing

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type ChartPoint = {
   id: string;
@@ -21,11 +21,7 @@ type HoverState = {
   flip: boolean;
 };
 
-const W = 860;
-const H = 300;
 const PAD = { top: 18, right: 20, bottom: 40, left: 72 };
-const CW = W - PAD.left - PAD.right;
-const CH = H - PAD.top - PAD.bottom;
 
 function clampRange(minValue: number, maxValue: number) {
   if (minValue === maxValue) {
@@ -72,6 +68,17 @@ export function CumulativePnlChart({ points }: CumulativePnlChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [hovered, setHovered] = useState<HoverState | null>(null);
+  const [dims, setDims] = useState({ w: 860, h: 300 });
+
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      if (width > 0 && height > 0) setDims({ w: Math.round(width), h: Math.round(height) });
+    });
+    ro.observe(svgRef.current);
+    return () => ro.disconnect();
+  }, []);
 
   if (points.length === 0) {
     return (
@@ -80,6 +87,10 @@ export function CumulativePnlChart({ points }: CumulativePnlChartProps) {
       </div>
     );
   }
+
+  const { w, h } = dims;
+  const CW = w - PAD.left - PAD.right;
+  const CH = h - PAD.top - PAD.bottom;
 
   const values = points.map((p) => p.cumulativePnl);
   const { min, max } = clampRange(Math.min(...values, 0), Math.max(...values, 0));
@@ -112,10 +123,10 @@ export function CumulativePnlChart({ points }: CumulativePnlChartProps) {
   function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
     if (!svgRef.current || !containerRef.current) return;
     const svgRect = svgRef.current.getBoundingClientRect();
-    const svgX = ((e.clientX - svgRect.left) / svgRect.width) * W;
-    const svgY = ((e.clientY - svgRect.top) / svgRect.height) * H;
+    const svgX = e.clientX - svgRect.left;
+    const svgY = e.clientY - svgRect.top;
 
-    if (svgX < PAD.left || svgX > W - PAD.right || svgY < PAD.top || svgY > H - PAD.bottom) {
+    if (svgX < PAD.left || svgX > w - PAD.right || svgY < PAD.top || svgY > h - PAD.bottom) {
       setHovered(null);
       return;
     }
@@ -135,7 +146,7 @@ export function CumulativePnlChart({ points }: CumulativePnlChartProps) {
     <div ref={containerRef} className="relative rounded-[24px] border border-white/8 bg-[#1e1f22] p-4 sm:p-5">
       <svg
         ref={svgRef}
-        viewBox={`0 0 ${W} ${H}`}
+        viewBox={`0 0 ${w} ${h}`}
         className="h-72 w-full"
         role="img"
         aria-label="Cumulative profit and loss chart"
@@ -159,7 +170,7 @@ export function CumulativePnlChart({ points }: CumulativePnlChartProps) {
           <g key={tick.y}>
             <line
               x1={PAD.left} y1={tick.y}
-              x2={W - PAD.right} y2={tick.y}
+              x2={w - PAD.right} y2={tick.y}
               stroke="rgba(255,255,255,0.07)" strokeWidth="1"
             />
             <text
@@ -174,7 +185,7 @@ export function CumulativePnlChart({ points }: CumulativePnlChartProps) {
         {/* Zero baseline */}
         <line
           x1={PAD.left} y1={clampedBaselineY}
-          x2={W - PAD.right} y2={clampedBaselineY}
+          x2={w - PAD.right} y2={clampedBaselineY}
           stroke="rgba(255,255,255,0.2)" strokeDasharray="5 5" strokeWidth="1"
         />
 
@@ -201,7 +212,7 @@ export function CumulativePnlChart({ points }: CumulativePnlChartProps) {
             />
             <line
               x1={PAD.left} y1={hp.y}
-              x2={W - PAD.right} y2={hp.y}
+              x2={w - PAD.right} y2={hp.y}
               stroke="rgba(255,255,255,0.1)" strokeWidth="1" strokeDasharray="3 3"
             />
           </>
@@ -234,12 +245,12 @@ export function CumulativePnlChart({ points }: CumulativePnlChartProps) {
         {/* Last value label */}
         {coords.length > 0 && !hovered && (
           <text
-            x={Math.min(coords[coords.length - 1].x + 10, W - PAD.right - 2)}
+            x={Math.min(coords[coords.length - 1].x + 10, w - PAD.right - 2)}
             y={coords[coords.length - 1].y - 10}
             fontSize="11"
             fontWeight="600"
             fill={lastValue >= 0 ? "#34d399" : "#fb7185"}
-            textAnchor={coords[coords.length - 1].x > W * 0.8 ? "end" : "start"}
+            textAnchor={coords[coords.length - 1].x > w * 0.8 ? "end" : "start"}
           >
             {formatAxisValue(lastValue)}
           </text>
@@ -252,11 +263,11 @@ export function CumulativePnlChart({ points }: CumulativePnlChartProps) {
             <g key={pt.id}>
               <line
                 x1={pt.x} y1={PAD.top}
-                x2={pt.x} y2={H - PAD.bottom}
+                x2={pt.x} y2={h - PAD.bottom}
                 stroke="rgba(255,255,255,0.04)"
               />
               <text
-                x={pt.x} y={H - 12}
+                x={pt.x} y={h - 12}
                 textAnchor="middle" fontSize="11" fill="rgba(148,155,164,0.9)"
               >
                 {formatChartDate(pt.closedAt)}

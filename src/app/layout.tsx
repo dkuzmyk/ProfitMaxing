@@ -19,6 +19,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Profit Maxing",
   description: "Trading journal with private and guest demo workflows",
+  icons: {
+    icon: "/favicon.png",
+  },
 };
 
 export default async function RootLayout({

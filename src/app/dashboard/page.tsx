@@ -5,18 +5,16 @@ import { CumulativePnlChart } from "@/components/cumulative-pnl-chart";
 import { DailyPnlBars } from "@/components/daily-pnl-bars";
 import { DashboardRangePicker } from "@/components/dashboard-range-picker";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
-import { formatCurrency, formatDateTime, formatPercent } from "@/lib/demo-data";
+import { formatCurrency, formatPercent } from "@/lib/demo-data";
 import { createClient } from "@/lib/supabase/server";
-import { deleteTrade } from "@/app/trades/actions";
 import {
   getCumulativePnlSeries,
   getDailyPnlSeries,
-  getTradeMarketValue,
   getStoredTradeMetrics,
-  getTradePnl,
-  getTradePnlPercent,
   getTradeRangeCutoff,
   getTradeRangeLabel,
+  getTradeStreak,
+  getMaxDrawdown,
   normalizeTradeRange,
 } from "@/lib/trade-metrics";
 
@@ -31,43 +29,30 @@ const rangeOptions = [
   { value: "all", label: "All" },
 ] as const;
 
-function EditIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4z" />
-    </svg>
+function formatHoldDuration(openedAt: string): string {
+  const minutes = Math.floor((Date.now() - new Date(openedAt).getTime()) / 60000);
+  if (minutes < 1) return "< 1m";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours < 24) return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  const days = Math.floor(hours / 24);
+  const rh = hours % 24;
+  return rh > 0 ? `${days}d ${rh}h` : `${days}d`;
+}
+
+function formatShortDate(dateStr: string): string {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(
+    new Date(dateStr),
   );
 }
 
-function DeleteIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 6h18" />
-      <path d="M8 6V4h8v2" />
-      <path d="M19 6l-1 14H6L5 6" />
-      <path d="M10 11v6" />
-      <path d="M14 11v6" />
-    </svg>
-  );
+function formatTodayLabel(): string {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).format(new Date());
 }
 
 export default async function DashboardPage({
@@ -98,29 +83,63 @@ export default async function DashboardPage({
   let tradesQuery = supabase
     .from("trades")
     .select(
-      "id, symbol, setup, direction, entry_price, exit_price, quantity, opened_at, closed_at, status, followed_plan, confidence_rating, grade, tags, mistake_tags",
+      "id, symbol, setup, direction, entry_price, exit_price, quantity, opened_at, closed_at, status, trade_date, entry_value, realized_pnl, realized_pnl_percent, holding_minutes, followed_plan, confidence_rating, grade, tags, mistake_tags",
     )
     .order("trade_date", { ascending: false })
     .order("opened_at", { ascending: false });
 
   if (rangeCutoffDate) {
-    tradesQuery = tradesQuery.gte("trade_date", rangeCutoffDate);
+    tradesQuery = tradesQuery.or(`trade_date.gte.${rangeCutoffDate},status.eq.Open`);
   }
 
-  const { data: trades, error: tradesError } = await tradesQuery;
+  const streakQuery = supabase
+    .from("trades")
+    .select("id, direction, entry_price, exit_price, closed_at, quantity")
+    .eq("status", "Closed")
+    .order("closed_at", { ascending: false })
+    .limit(60);
 
-  const hasDataError = tradesError;
+  const [{ data: trades, error: tradesError }, { data: streakData }] = await Promise.all([
+    tradesQuery,
+    streakQuery,
+  ]);
+
   const allTrades = trades ?? [];
+  const openPositions = allTrades.filter((t) => t.status === "Open");
+  const closedInRange = allTrades.filter((t) => t.status === "Closed");
+
+  // Today's session
+  const todayDateStr = new Date().toISOString().slice(0, 10);
+  const todayTrades = closedInRange.filter((t) => t.trade_date === todayDateStr);
+  const todayPnl = todayTrades.reduce((s, t) => s + Number(t.realized_pnl ?? 0), 0);
+
+  // Streak from all-time data
+  const streak = getTradeStreak(streakData ?? []);
+
+  // Plan adherence for the range
+  const closedWithPlanData = closedInRange.filter((t) => t.followed_plan !== null);
+  const planAdherence =
+    closedWithPlanData.length > 0
+      ? closedWithPlanData.filter((t) => t.followed_plan === true).length /
+        closedWithPlanData.length
+      : null;
+
+  // Max drawdown from range data
+  const { maxDrawdown, currentDrawdown } = getMaxDrawdown(allTrades);
+
+  // Existing metrics/series
   const metrics = getStoredTradeMetrics(allTrades);
   const cumulativeSeries = getCumulativePnlSeries(allTrades);
   const dailySeries = getDailyPnlSeries(allTrades);
-  const recentTrades = allTrades.slice(0, 6);
+
+  const recentTrades = closedInRange.slice(0, 5);
 
   return (
     <main className="px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
         <WorkspaceTabs variant="real" />
 
+        {/* Toast notifications */}
         {created || updated || deleted || message ? (
           <div
             className={`rounded-[24px] border px-4 py-3 text-sm ${
@@ -138,345 +157,382 @@ export default async function DashboardPage({
           </div>
         ) : null}
 
-        <section className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
-          <div className="grid gap-3 md:grid-cols-4">
-            <Link
-              href="/trades/new"
-              className="rounded-[22px] bg-[#5865f2] px-4 py-3 text-center text-sm font-medium text-white transition hover:bg-[#4752c4]"
-            >
-              Add trade
-            </Link>
-            <Link
-              href="/trades/import"
-              className="rounded-[22px] border border-white/10 bg-[#1e1f22] px-4 py-3 text-center text-sm font-medium text-[#dbdee1] transition hover:border-[#5865f2]/40 hover:text-white"
-            >
-              CSV import
-            </Link>
-            <button
-              type="button"
-              disabled
-              className="rounded-[22px] border border-white/10 bg-[#1e1f22] px-4 py-3 text-sm font-medium text-[#6d7278]"
-            >
-              Webull sync soon
-            </button>
-            <button
-              type="button"
-              disabled
-              className="rounded-[22px] border border-white/10 bg-[#1e1f22] px-4 py-3 text-sm font-medium text-[#6d7278]"
-            >
-              Broker sync soon
-            </button>
-          </div>
+        {/* Action bar */}
+        <section className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/trades/new"
+            className="rounded-[20px] bg-[#5865f2] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#4752c4] transition"
+          >
+            + Add Trade
+          </Link>
+          <Link
+            href="/trades/import"
+            className="rounded-[20px] border border-white/10 bg-[#1e1f22] px-5 py-2.5 text-sm font-medium text-[#dbdee1] hover:border-[#5865f2]/40 transition"
+          >
+            ↑ CSV Import
+          </Link>
+          <span className="rounded-[20px] border border-white/6 bg-transparent px-4 py-2.5 text-sm text-[#4a4d52] cursor-default">
+            Webull sync · soon
+          </span>
+          <span className="rounded-[20px] border border-white/6 bg-transparent px-4 py-2.5 text-sm text-[#4a4d52] cursor-default">
+            Broker sync · soon
+          </span>
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-[1.45fr_0.55fr]">
-          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div>
-                <p className="text-sm uppercase tracking-[0.2em] text-[#949ba4]">
-                  Performance
-                </p>
-                <h2 className="mt-2 text-2xl font-semibold text-white">
-                  Cumulative P&amp;L
-                </h2>
-                <p className="mt-2 text-sm leading-7 text-[#b5bac1]">
-                  {getTradeRangeLabel(selectedRange)}. Every summary stat below
-                  is calculated from trades inside the selected range.
-                </p>
-              </div>
-
-              <DashboardRangePicker
-                options={rangeOptions}
-                selectedRange={selectedRange}
-              />
-            </div>
-
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <div className="min-w-0 rounded-[24px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  Total P&amp;L
-                </p>
-                <p className={`mt-2 break-words text-lg font-semibold leading-tight sm:text-xl ${
-                  metrics.totalClosedPnl > 0 ? "text-emerald-400" : metrics.totalClosedPnl < 0 ? "text-rose-400" : "text-white"
-                }`}>
-                  {formatCurrency(metrics.totalClosedPnl)}
-                </p>
-              </div>
-              <div className="min-w-0 rounded-[24px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  P&amp;L %
-                </p>
-                <p className={`mt-2 break-words text-lg font-semibold leading-tight sm:text-xl ${
-                  metrics.pnlPercent > 0 ? "text-emerald-400" : metrics.pnlPercent < 0 ? "text-rose-400" : "text-white"
-                }`}>
-                  {formatPercent(metrics.pnlPercent)}
-                </p>
-              </div>
-              <div className="min-w-0 rounded-[24px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  Currently Invested
-                </p>
-                <p className="mt-2 break-words text-lg font-semibold leading-tight text-white sm:text-xl">
-                  {formatCurrency(metrics.totalCurrentlyInvested)}
-                </p>
-              </div>
-              <div className="min-w-0 rounded-[24px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  Total Traded
-                </p>
-                <p className="mt-2 break-words text-lg font-semibold leading-tight text-white sm:text-xl">
-                  {formatCurrency(metrics.totalMoneyTraded)}
-                </p>
-              </div>
-              <div className="min-w-0 rounded-[24px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  Return %
-                </p>
-                <p className={`mt-2 break-words text-lg font-semibold leading-tight sm:text-xl ${
-                  metrics.returnPercent > 0 ? "text-emerald-400" : metrics.returnPercent < 0 ? "text-rose-400" : "text-white"
-                }`}>
-                  {formatPercent(metrics.returnPercent)}
-                </p>
-              </div>
-              <div className="min-w-0 rounded-[24px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  Win Rate
-                </p>
-                <p className={`mt-2 break-words text-lg font-semibold leading-tight sm:text-xl ${
-                  metrics.winRate >= 0.55 ? "text-emerald-400" : metrics.winRate >= 0.40 ? "text-white" : metrics.closedTrades > 0 ? "text-rose-400" : "text-white"
-                }`}>
-                  {metrics.closedTrades ? formatPercent(metrics.winRate) : "--"}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <CumulativePnlChart points={cumulativeSeries} />
-            </div>
+        {/* Today's Session */}
+        <section className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs uppercase tracking-widest text-[#949ba4]">Today&apos;s Session</p>
+            <p className="text-xs text-[#6d7278]">{formatTodayLabel()}</p>
           </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {/* Today P&L */}
+            <div className="rounded-[22px] bg-[#1e1f22] p-4">
+              <p className="text-[10px] uppercase tracking-wider text-[#6d7278]">P&amp;L Today</p>
+              <p
+                className={`mt-1.5 text-xl font-bold ${
+                  todayPnl > 0
+                    ? "text-emerald-400"
+                    : todayPnl < 0
+                      ? "text-rose-400"
+                      : "text-white"
+                }`}
+              >
+                {formatCurrency(todayPnl)}
+              </p>
+              <p className="mt-1 text-xs text-[#6d7278]">
+                {todayTrades.length} trade{todayTrades.length !== 1 ? "s" : ""} closed
+              </p>
+            </div>
 
-          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
-            <p className="text-sm uppercase tracking-[0.2em] text-[#949ba4]">
-              Context
-            </p>
-            <div className="mt-5 grid gap-4">
-              <div className="rounded-[24px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  Profit Factor
-                </p>
-                <p className="mt-2 text-xl font-semibold text-white">
-                  {metrics ? metrics.profitFactor.toFixed(2) : "--"}
-                </p>
-              </div>
-              <div className="rounded-[24px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  Average Win
-                </p>
-                <p className="mt-2 text-xl font-semibold text-emerald-400">
-                  {metrics ? formatCurrency(metrics.averageWin) : "--"}
-                </p>
-              </div>
-              <div className="rounded-[24px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  Average Loss
-                </p>
-                <p className="mt-2 text-xl font-semibold text-rose-400">
-                  {metrics ? formatCurrency(metrics.averageLoss) : "--"}
-                </p>
-              </div>
-              <div className="rounded-[24px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  Open / Closed
-                </p>
-                <p className="mt-2 text-xl font-semibold text-white">
-                  {`${metrics?.openTrades ?? 0} / ${metrics?.closedTrades ?? 0}`}
-                </p>
-              </div>
-              <div className="rounded-[24px] bg-[#1e1f22] p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#949ba4]">
-                  Avg Hold
-                </p>
-                <p className="mt-2 text-xl font-semibold text-white">
-                  {metrics ? `${Math.round(metrics.averageHoldMinutes)} min` : "--"}
-                </p>
-                <p className="mt-3 text-sm font-medium text-emerald-400">
-                  {metrics?.bestTrade
-                    ? `Best: ${metrics.bestTrade.symbol} · ${formatCurrency(metrics.bestTrade.pnl)}`
-                    : "Best: none"}
-                </p>
-                <p className="mt-2 text-sm font-medium text-rose-400">
-                  {metrics?.worstTrade
-                    ? `Worst: ${metrics.worstTrade.symbol} · ${formatCurrency(metrics.worstTrade.pnl)}`
-                    : "Worst: none"}
-                </p>
-              </div>
+            {/* Streak */}
+            <div className="rounded-[22px] bg-[#1e1f22] p-4">
+              <p className="text-[10px] uppercase tracking-wider text-[#6d7278]">Streak</p>
+              <p
+                className={`mt-1.5 text-xl font-bold ${
+                  streak.count > 0
+                    ? streak.type === "win"
+                      ? "text-emerald-400"
+                      : "text-rose-400"
+                    : "text-white"
+                }`}
+              >
+                {streak.count > 0
+                  ? `${streak.count}${streak.type === "win" ? "W" : "L"}`
+                  : "—"}
+              </p>
+              <p className="mt-1 text-xs text-[#6d7278]">
+                {streak.count > 0 ? "consecutive" : "no data yet"}
+              </p>
+            </div>
+
+            {/* Plan Adherence */}
+            <div className="rounded-[22px] bg-[#1e1f22] p-4">
+              <p className="text-[10px] uppercase tracking-wider text-[#6d7278]">Followed Plan</p>
+              <p
+                className={`mt-1.5 text-xl font-bold ${
+                  planAdherence === null
+                    ? "text-white"
+                    : planAdherence >= 0.75
+                      ? "text-emerald-400"
+                      : planAdherence >= 0.5
+                        ? "text-white"
+                        : "text-rose-400"
+                }`}
+              >
+                {planAdherence !== null ? formatPercent(planAdherence) : "—"}
+              </p>
+              <p className="mt-1 text-xs text-[#6d7278]">
+                {closedInRange.length} trades in range
+              </p>
+            </div>
+
+            {/* Open Positions */}
+            <div className="rounded-[22px] bg-[#1e1f22] p-4">
+              <p className="text-[10px] uppercase tracking-wider text-[#6d7278]">Open Positions</p>
+              <p className="mt-1.5 text-xl font-bold text-white">{openPositions.length}</p>
+              <p className="mt-1 text-xs text-[#6d7278]">
+                {openPositions.length > 0
+                  ? `${formatCurrency(metrics.totalCurrentlyInvested)} deployed`
+                  : "all flat"}
+              </p>
             </div>
           </div>
         </section>
 
+        {/* Performance section — full width chart card + stat strip */}
         <section className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
-          <div className="flex items-baseline justify-between">
-            <p className="text-sm uppercase tracking-[0.2em] text-[#949ba4]">
-              Daily P&amp;L
-            </p>
+          {/* Header row */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-widest text-[#949ba4]">Performance</p>
+              <h2
+                className={`mt-1.5 text-2xl font-bold ${
+                  metrics.totalClosedPnl > 0
+                    ? "text-emerald-400"
+                    : metrics.totalClosedPnl < 0
+                      ? "text-rose-400"
+                      : "text-white"
+                }`}
+              >
+                {formatCurrency(metrics.totalClosedPnl)}
+              </h2>
+              <p className="mt-1 text-xs text-[#6d7278]">{getTradeRangeLabel(selectedRange)}</p>
+            </div>
+            <DashboardRangePicker options={rangeOptions} selectedRange={selectedRange} />
+          </div>
+
+          {/* Stat strip */}
+          <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="rounded-[18px] bg-[#1e1f22] px-3 py-3">
+              <p className="text-[10px] uppercase tracking-wider text-[#6d7278]">Win Rate</p>
+              <p className={`mt-1 text-base font-bold ${
+                metrics.closedTrades === 0 ? "text-white"
+                  : metrics.winRate >= 0.55 ? "text-emerald-400"
+                  : metrics.winRate >= 0.4 ? "text-white"
+                  : "text-rose-400"
+              }`}>
+                {metrics.closedTrades ? formatPercent(metrics.winRate) : "—"}
+              </p>
+            </div>
+            <div className="rounded-[18px] bg-[#1e1f22] px-3 py-3">
+              <p className="text-[10px] uppercase tracking-wider text-[#6d7278]">Profit Factor</p>
+              <p className="mt-1 text-base font-bold text-white">
+                {metrics.profitFactor.toFixed(2)}
+              </p>
+            </div>
+            <div className="rounded-[18px] bg-[#1e1f22] px-3 py-3">
+              <p className="text-[10px] uppercase tracking-wider text-[#6d7278]">Avg Win</p>
+              <p className="mt-1 text-base font-bold text-emerald-400">
+                {formatCurrency(metrics.averageWin)}
+              </p>
+            </div>
+            <div className="rounded-[18px] bg-[#1e1f22] px-3 py-3">
+              <p className="text-[10px] uppercase tracking-wider text-[#6d7278]">Avg Loss</p>
+              <p className="mt-1 text-base font-bold text-rose-400">
+                {formatCurrency(metrics.averageLoss)}
+              </p>
+            </div>
+            <div className="rounded-[18px] bg-[#1e1f22] px-3 py-3">
+              <p className="text-[10px] uppercase tracking-wider text-[#6d7278]">Max Drawdown</p>
+              <p className={`mt-1 text-base font-bold ${maxDrawdown > 0 ? "text-rose-400" : "text-[#6d7278]"}`}>
+                {maxDrawdown > 0 ? `-${formatCurrency(maxDrawdown)}` : "—"}
+              </p>
+            </div>
+            <div className="rounded-[18px] bg-[#1e1f22] px-3 py-3">
+              <p className="text-[10px] uppercase tracking-wider text-[#6d7278]">Cur. Drawdown</p>
+              <p className={`mt-1 text-base font-bold ${currentDrawdown > 0 ? "text-rose-400" : "text-emerald-400"}`}>
+                {currentDrawdown > 0 ? `-${formatCurrency(currentDrawdown)}` : "At peak"}
+              </p>
+            </div>
+          </div>
+
+          {/* Chart */}
+          <div className="mt-5">
+            <CumulativePnlChart points={cumulativeSeries} />
+          </div>
+
+          {/* Best / Worst footer */}
+          {metrics.bestTrade ? (
+            <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-white/6 pt-4 text-[12px]">
+              <span className="text-[#6d7278]">
+                Best: <span className="font-semibold text-emerald-400">{metrics.bestTrade.symbol} · {formatCurrency(metrics.bestTrade.pnl)}</span>
+              </span>
+              {metrics.worstTrade ? (
+                <span className="text-[#6d7278]">
+                  Worst: <span className="font-semibold text-rose-400">{metrics.worstTrade.symbol} · {formatCurrency(metrics.worstTrade.pnl)}</span>
+                </span>
+              ) : null}
+              <span className="ml-auto text-[#4a4d52]">
+                {metrics.closedTrades} closed · {metrics.openTrades} open
+              </span>
+            </div>
+          ) : null}
+        </section>
+
+        {/* Open Positions */}
+        {openPositions.length > 0 ? (
+          <section className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-xs uppercase tracking-widest text-[#949ba4]">
+                Open Positions · {openPositions.length}
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {openPositions.map((pos) => (
+                <Link
+                  href={`/trades/${pos.id}`}
+                  key={pos.id}
+                  className="rounded-[22px] bg-[#1e1f22] p-4 hover:bg-[#26272b] transition"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-white">{pos.symbol}</p>
+                      <p className="text-xs text-[#6d7278] mt-0.5">
+                        {pos.direction} · {pos.quantity} shares
+                      </p>
+                    </div>
+                    <span
+                      className={`text-xs font-medium rounded-full px-2 py-1 ${
+                        pos.direction === "Long"
+                          ? "bg-emerald-500/12 text-emerald-400"
+                          : "bg-rose-500/12 text-rose-400"
+                      }`}
+                    >
+                      {pos.direction}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-[#6d7278]">Entry</p>
+                      <p className="font-medium text-[#b5bac1]">
+                        {formatCurrency(Number(pos.entry_price))}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-[#6d7278]">Value</p>
+                      <p className="font-medium text-[#b5bac1]">
+                        {formatCurrency(Number(pos.entry_value ?? 0))}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs text-[#6d7278]">
+                    Held {formatHoldDuration(pos.opened_at)}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {/* Daily P&L */}
+        <section className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6">
+          <div className="flex items-baseline justify-between mb-4">
+            <p className="text-xs uppercase tracking-widest text-[#949ba4]">Daily P&amp;L</p>
             <p className="text-xs text-[#6d7278]">
-              {dailySeries.length} trading day{dailySeries.length === 1 ? "" : "s"}
+              {dailySeries.length} day{dailySeries.length !== 1 ? "s" : ""}
             </p>
           </div>
-          <div className="mt-4">
-            <DailyPnlBars points={dailySeries} />
-          </div>
+          <DailyPnlBars points={dailySeries} />
         </section>
 
-        <section className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
-          <p className="text-sm uppercase tracking-[0.2em] text-[#949ba4]">
-            Range Trades
-          </p>
+        {/* Recent Trades */}
+        <section className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-6">
+          <div className="flex items-center justify-between mb-5">
+            <p className="text-xs uppercase tracking-widest text-[#949ba4]">Recent Trades</p>
+            <Link href="/trades" className="text-xs text-[#5865f2] hover:text-white transition">
+              View all →
+            </Link>
+          </div>
 
-          {hasDataError ? (
+          {tradesError ? (
             <p className="mt-4 rounded-2xl border border-[#f0b232]/20 bg-[#f0b232]/10 px-4 py-3 text-sm leading-7 text-[#f5c96a]">
-              The dashboard loaded, but the `trades` query failed. If you just
-              created the table, double-check that the SQL ran successfully.
+              The dashboard loaded, but the trades query failed. If you just created the table,
+              double-check that the SQL ran successfully.
             </p>
           ) : recentTrades.length > 0 ? (
-            <div className="mt-5 rounded-[24px] border border-white/8">
+            <div className="rounded-[24px] border border-white/8 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="min-w-[1180px] w-full divide-y divide-white/8">
-                <thead className="bg-[#1e1f22] text-left text-[11px] uppercase tracking-[0.16em] text-[#949ba4]">
-                  <tr>
-                    <th className="w-[112px] px-2 py-2.5">Trade</th>
-                    <th className="w-[106px] px-2 py-2.5">Opened</th>
-                    <th className="w-[68px] px-2 py-2.5">Status</th>
-                    <th className="w-[64px] px-2 py-2.5">Shares</th>
-                    <th className="w-[104px] px-2 py-2.5">Invested</th>
-                    <th className="w-[88px] px-2 py-2.5">Entry</th>
-                    <th className="w-[88px] px-2 py-2.5">Exit</th>
-                    <th className="w-[96px] px-2 py-2.5">P&amp;L</th>
-                    <th className="w-[78px] px-2 py-2.5">P&amp;L %</th>
-                    <th className="w-[88px] px-2 py-2.5">Review</th>
-                    <th className="w-[150px] px-2 py-2.5">Tags</th>
-                    <th className="w-[78px] px-2 py-2.5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/6 text-[13px]">
-                  {recentTrades.map((trade) => {
-                    const pnl = getTradePnl(trade);
-                    const marketValue = getTradeMarketValue(trade);
-                    const pnlPercent = getTradePnlPercent(trade);
+                <table className="min-w-[760px] w-full divide-y divide-white/8">
+                  <thead className="bg-[#1e1f22] text-left text-[11px] uppercase tracking-[0.16em] text-[#949ba4]">
+                    <tr>
+                      <th className="px-3 py-2.5">Trade</th>
+                      <th className="px-3 py-2.5">Date</th>
+                      <th className="px-3 py-2.5">Qty</th>
+                      <th className="px-3 py-2.5">Entry</th>
+                      <th className="px-3 py-2.5">Exit</th>
+                      <th className="px-3 py-2.5">P&amp;L</th>
+                      <th className="px-3 py-2.5">P&amp;L %</th>
+                      <th className="px-3 py-2.5">Review</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/6 text-[13px]">
+                    {recentTrades.map((trade) => {
+                      const pnl =
+                        trade.realized_pnl != null ? Number(trade.realized_pnl) : null;
+                      const pnlPct =
+                        trade.realized_pnl_percent != null
+                          ? Number(trade.realized_pnl_percent)
+                          : null;
 
-                    return (
-                      <tr key={trade.id} className="transition hover:bg-white/[0.02]">
-                        <td className="px-2 py-2.5">
-                          <Link
-                            href={`/trades/${trade.id}`}
-                            className="whitespace-nowrap font-medium text-white transition hover:text-[#5865f2]"
-                          >
-                            {trade.symbol} · {trade.direction}
-                          </Link>
-                        </td>
-                        <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
-                          {formatDateTime(trade.opened_at)}
-                        </td>
-                        <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
-                          {trade.status}
-                        </td>
-                        <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
-                          {trade.quantity}
-                        </td>
-                        <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
-                          {formatCurrency(marketValue)}
-                        </td>
-                        <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
-                          {formatCurrency(Number(trade.entry_price))}
-                        </td>
-                        <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
-                          {trade.exit_price
-                            ? formatCurrency(Number(trade.exit_price))
-                            : "Open"}
-                        </td>
-                        <td
-                          className={`whitespace-nowrap px-2 py-2.5 font-medium ${
-                            pnl == null
-                              ? "text-[#949ba4]"
-                              : pnl >= 0
-                                ? "text-emerald-400"
-                                : "text-rose-400"
-                          }`}
+                      return (
+                        <tr
+                          key={trade.id}
+                          className="cursor-pointer hover:bg-white/[0.025] transition"
                         >
-                          {pnl == null ? "Pending" : formatCurrency(pnl)}
-                        </td>
-                        <td
-                          className={`whitespace-nowrap px-2 py-2.5 font-medium ${
-                            pnlPercent == null
-                              ? "text-[#949ba4]"
-                              : pnlPercent >= 0
-                                ? "text-emerald-400"
-                                : "text-rose-400"
-                          }`}
-                        >
-                          {pnlPercent == null ? "Pending" : formatPercent(pnlPercent)}
-                        </td>
-                        <td className="whitespace-nowrap px-2 py-2.5 text-[#b5bac1]">
-                          {trade.grade ?? "--"}
-                          {trade.confidence_rating
-                            ? ` · ${trade.confidence_rating}/5`
-                            : ""}
-                        </td>
-                        <td className="px-2 py-2.5 text-[#b5bac1]">
-                          <div className="flex max-w-[136px] flex-wrap gap-1">
-                            {trade.tags.slice(0, 2).map((tag) => (
-                              <span
-                                key={tag}
-                                className="rounded-full bg-white/6 px-2 py-1 text-[11px] text-[#dbdee1]"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                            {trade.mistake_tags.slice(0, 1).map((tag) => (
-                              <span
-                                key={tag}
-                                className="rounded-full bg-rose-500/12 px-2 py-1 text-[11px] text-rose-300"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                            {trade.tags.length === 0 && trade.mistake_tags.length === 0 ? (
-                              <span className="text-[11px] text-[#6d7278]">None</span>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="px-2 py-2.5">
-                          <div className="flex items-center justify-end gap-2">
+                          <td className="px-3 py-2.5">
                             <Link
-                              href={`/trades/${trade.id}/edit`}
-                              aria-label={`Edit ${trade.symbol} trade`}
-                              title="Edit trade"
-                              className="rounded-xl border border-white/10 bg-[#1e1f22] p-2 text-[#b5bac1] transition hover:border-[#5865f2]/40 hover:bg-[#16171a] hover:text-white"
+                              href={`/trades/${trade.id}`}
+                              className="whitespace-nowrap font-medium text-white hover:text-[#5865f2] transition"
                             >
-                              <EditIcon />
+                              {trade.symbol} · {trade.direction}
                             </Link>
-                            <form action={deleteTrade}>
-                              <input type="hidden" name="tradeId" value={trade.id} />
-                              <button
-                                type="submit"
-                                aria-label={`Delete ${trade.symbol} trade`}
-                                title="Delete trade"
-                                className="rounded-xl border border-white/10 bg-[#1e1f22] p-2 text-[#b5bac1] transition hover:border-rose-500/40 hover:bg-[#16171a] hover:text-rose-300"
-                              >
-                                <DeleteIcon />
-                              </button>
-                            </form>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5 text-[#b5bac1]">
+                            <Link href={`/trades/${trade.id}`} className="block">
+                              {trade.trade_date ? formatShortDate(trade.trade_date) : "—"}
+                            </Link>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5 text-[#b5bac1]">
+                            <Link href={`/trades/${trade.id}`} className="block">
+                              {trade.quantity}
+                            </Link>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5 text-[#b5bac1]">
+                            <Link href={`/trades/${trade.id}`} className="block">
+                              {formatCurrency(Number(trade.entry_price))}
+                            </Link>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5 text-[#b5bac1]">
+                            <Link href={`/trades/${trade.id}`} className="block">
+                              {trade.exit_price
+                                ? formatCurrency(Number(trade.exit_price))
+                                : "Open"}
+                            </Link>
+                          </td>
+                          <td
+                            className={`whitespace-nowrap px-3 py-2.5 font-medium ${
+                              pnl == null
+                                ? "text-[#949ba4]"
+                                : pnl >= 0
+                                  ? "text-emerald-400"
+                                  : "text-rose-400"
+                            }`}
+                          >
+                            <Link href={`/trades/${trade.id}`} className="block">
+                              {pnl == null ? "Pending" : formatCurrency(pnl)}
+                            </Link>
+                          </td>
+                          <td
+                            className={`whitespace-nowrap px-3 py-2.5 font-medium ${
+                              pnlPct == null
+                                ? "text-[#949ba4]"
+                                : pnlPct >= 0
+                                  ? "text-emerald-400"
+                                  : "text-rose-400"
+                            }`}
+                          >
+                            <Link href={`/trades/${trade.id}`} className="block">
+                              {pnlPct == null ? "Pending" : formatPercent(pnlPct)}
+                            </Link>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5 text-[#b5bac1]">
+                            <Link href={`/trades/${trade.id}`} className="block">
+                              {trade.grade ?? "—"}
+                              {trade.confidence_rating
+                                ? ` · ${trade.confidence_rating}/5`
+                                : ""}
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
                 </table>
               </div>
             </div>
           ) : (
-            <div className="mt-4 rounded-2xl border border-white/8 bg-[#1e1f22] px-4 py-4 text-sm leading-7 text-[#b5bac1]">
+            <div className="rounded-2xl border border-white/8 bg-[#1e1f22] px-4 py-4 text-sm leading-7 text-[#b5bac1]">
               <p>
                 {allTrades.length > 0
                   ? "No trades match the selected timeframe yet."

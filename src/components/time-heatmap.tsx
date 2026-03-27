@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type HeatmapCell = {
   hour: number;
@@ -29,15 +29,9 @@ type HoverState = {
   flipY: boolean;
 };
 
-const W = 860;
-const H = 224;
 const PAD = { top: 20, right: 16, bottom: 36, left: 44 };
-const CW = W - PAD.left - PAD.right; // 800
-const CH = H - PAD.top - PAD.bottom; // 168
 const DAYS = 7;
 const HOURS = 24;
-const CELL_W = CW / HOURS;
-const CELL_H = CH / DAYS;
 const GAP = 2;
 
 const HOUR_TICKS = [
@@ -67,6 +61,17 @@ export function TimeHeatmap({ data }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [hovered, setHovered] = useState<HoverState | null>(null);
+  const [dims, setDims] = useState({ w: 860, h: 224 });
+
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      if (width > 0 && height > 0) setDims({ w: Math.round(width), h: Math.round(height) });
+    });
+    ro.observe(svgRef.current);
+    return () => ro.disconnect();
+  }, []);
 
   let maxAbsAvgPnl = 0;
   let hasData = false;
@@ -90,13 +95,19 @@ export function TimeHeatmap({ data }: Props) {
     );
   }
 
+  const { w, h } = dims;
+  const CW = w - PAD.left - PAD.right;
+  const CH = h - PAD.top - PAD.bottom;
+  const CELL_W = CW / HOURS;
+  const CELL_H = CH / DAYS;
+
   function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
     if (!svgRef.current || !containerRef.current) return;
     const svgRect = svgRef.current.getBoundingClientRect();
-    const svgX = ((e.clientX - svgRect.left) / svgRect.width) * W;
-    const svgY = ((e.clientY - svgRect.top) / svgRect.height) * H;
+    const svgX = e.clientX - svgRect.left;
+    const svgY = e.clientY - svgRect.top;
 
-    if (svgX < PAD.left || svgX > W - PAD.right || svgY < PAD.top || svgY > H - PAD.bottom) {
+    if (svgX < PAD.left || svgX > w - PAD.right || svgY < PAD.top || svgY > h - PAD.bottom) {
       setHovered(null);
       return;
     }
@@ -131,7 +142,7 @@ export function TimeHeatmap({ data }: Props) {
     <div ref={containerRef} className="relative rounded-[24px] border border-white/8 bg-[#1e1f22] p-4 sm:p-5">
       <svg
         ref={svgRef}
-        viewBox={`0 0 ${W} ${H}`}
+        viewBox={`0 0 ${w} ${h}`}
         className="h-[224px] w-full"
         role="img"
         aria-label="Time of day heatmap"
@@ -157,7 +168,7 @@ export function TimeHeatmap({ data }: Props) {
           <text
             key={`hour-${hour}`}
             x={PAD.left + hour * CELL_W + CELL_W / 2}
-            y={H - 10}
+            y={h - 10}
             textAnchor="middle"
             fontSize="10"
             fill={hovered?.hour === hour ? "rgba(255,255,255,0.9)" : "rgba(148,155,164,0.85)"}
@@ -171,8 +182,8 @@ export function TimeHeatmap({ data }: Props) {
           dayData.hours.map((cell) => {
             const x = PAD.left + cell.hour * CELL_W + GAP / 2;
             const y = PAD.top + dayData.day * CELL_H + GAP / 2;
-            const w = CELL_W - GAP;
-            const h = CELL_H - GAP;
+            const cw = CELL_W - GAP;
+            const ch = CELL_H - GAP;
             const isHovered = hovered?.day === dayData.day && hovered?.hour === cell.hour;
 
             if (cell.count === 0) {
@@ -180,7 +191,7 @@ export function TimeHeatmap({ data }: Props) {
                 <rect
                   key={`${dayData.day}-${cell.hour}`}
                   x={x} y={y}
-                  width={w} height={h}
+                  width={cw} height={ch}
                   fill="rgba(255,255,255,0.03)"
                   rx="2"
                 />
@@ -198,7 +209,7 @@ export function TimeHeatmap({ data }: Props) {
               <rect
                 key={`${dayData.day}-${cell.hour}`}
                 x={x} y={y}
-                width={w} height={h}
+                width={cw} height={ch}
                 fill={fill}
                 opacity={opacity}
                 rx="2"

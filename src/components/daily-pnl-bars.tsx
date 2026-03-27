@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { DailyPnlPoint } from "@/lib/trade-metrics";
 
@@ -15,11 +15,7 @@ type HoverState = {
   flip: boolean;
 };
 
-const W = 860;
-const H = 200;
 const PAD = { top: 14, right: 16, bottom: 38, left: 68 };
-const CW = W - PAD.left - PAD.right;
-const CH = H - PAD.top - PAD.bottom;
 const Y_TICKS = 5;
 
 function fmtDate(date: string) {
@@ -50,6 +46,17 @@ export function DailyPnlBars({ points }: DailyPnlBarsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [hovered, setHovered] = useState<HoverState | null>(null);
+  const [dims, setDims] = useState({ w: 860, h: 200 });
+
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      if (width > 0 && height > 0) setDims({ w: Math.round(width), h: Math.round(height) });
+    });
+    ro.observe(svgRef.current);
+    return () => ro.disconnect();
+  }, []);
 
   if (points.length === 0) {
     return (
@@ -58,6 +65,10 @@ export function DailyPnlBars({ points }: DailyPnlBarsProps) {
       </div>
     );
   }
+
+  const { w, h } = dims;
+  const CW = w - PAD.left - PAD.right;
+  const CH = h - PAD.top - PAD.bottom;
 
   const visible = points.slice(-90);
   const N = visible.length;
@@ -96,10 +107,10 @@ export function DailyPnlBars({ points }: DailyPnlBarsProps) {
     if (!svgRef.current || !containerRef.current) return;
 
     const svgRect = svgRef.current.getBoundingClientRect();
-    const svgX = ((e.clientX - svgRect.left) / svgRect.width) * W;
-    const svgY = ((e.clientY - svgRect.top) / svgRect.height) * H;
+    const svgX = e.clientX - svgRect.left;
+    const svgY = e.clientY - svgRect.top;
 
-    if (svgX < PAD.left || svgX > W - PAD.right || svgY < PAD.top || svgY > H - PAD.bottom) {
+    if (svgX < PAD.left || svgX > w - PAD.right || svgY < PAD.top || svgY > h - PAD.bottom) {
       setHovered(null);
       return;
     }
@@ -126,7 +137,7 @@ export function DailyPnlBars({ points }: DailyPnlBarsProps) {
     <div ref={containerRef} className="relative rounded-[24px] border border-white/8 bg-[#1e1f22] p-4 sm:p-5">
       <svg
         ref={svgRef}
-        viewBox={`0 0 ${W} ${H}`}
+        viewBox={`0 0 ${w} ${h}`}
         className="h-48 w-full"
         role="img"
         aria-label="Daily profit and loss bar chart"
@@ -138,7 +149,7 @@ export function DailyPnlBars({ points }: DailyPnlBarsProps) {
           <g key={tick.y}>
             <line
               x1={PAD.left} y1={tick.y}
-              x2={W - PAD.right} y2={tick.y}
+              x2={w - PAD.right} y2={tick.y}
               stroke="rgba(255,255,255,0.06)" strokeWidth="1"
             />
             <text x={PAD.left - 8} y={tick.y + 4} textAnchor="end" fontSize="11" fill="rgba(148,155,164,0.85)">
@@ -150,7 +161,7 @@ export function DailyPnlBars({ points }: DailyPnlBarsProps) {
         {/* Zero baseline */}
         <line
           x1={PAD.left} y1={zeroY}
-          x2={W - PAD.right} y2={zeroY}
+          x2={w - PAD.right} y2={zeroY}
           stroke="rgba(255,255,255,0.18)" strokeWidth="1"
         />
 
@@ -199,7 +210,7 @@ export function DailyPnlBars({ points }: DailyPnlBarsProps) {
           return (
             <text
               key={visible[i].date}
-              x={cx} y={H - 10}
+              x={cx} y={h - 10}
               textAnchor="middle" fontSize="11"
               fill="rgba(148,155,164,0.85)"
             >

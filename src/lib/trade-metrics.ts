@@ -260,3 +260,73 @@ export function getCumulativePnlSeries(trades: StoredTrade[]) {
     };
   });
 }
+
+export type StreakEntry = {
+  direction: "Long" | "Short";
+  entry_price: number | string;
+  exit_price: number | string | null;
+  closed_at: string | null;
+  quantity: number;
+};
+
+export function getTradeStreak(entries: StreakEntry[]): { count: number; type: "win" | "loss" | "none" } {
+  // Filter to closed trades only and sort ascending by closed_at
+  const closed = entries
+    .filter((e) => e.exit_price != null && e.closed_at != null)
+    .sort((a, b) => new Date(a.closed_at!).getTime() - new Date(b.closed_at!).getTime());
+
+  if (closed.length === 0) {
+    return { count: 0, type: "none" };
+  }
+
+  // Walk backwards from most recent and count consecutive wins or losses
+  const pnlOf = (e: StreakEntry): number => {
+    const entry = typeof e.entry_price === "number" ? e.entry_price : Number(e.entry_price);
+    const exit = typeof e.exit_price === "number" ? e.exit_price as number : Number(e.exit_price);
+    const delta = e.direction === "Long" ? exit - entry : entry - exit;
+    return delta * e.quantity;
+  };
+
+  const last = closed[closed.length - 1];
+  const lastPnl = pnlOf(last);
+  const streakType: "win" | "loss" = lastPnl >= 0 ? "win" : "loss";
+  let count = 1;
+
+  for (let i = closed.length - 2; i >= 0; i--) {
+    const pnl = pnlOf(closed[i]);
+    const isWin = pnl >= 0;
+    if ((streakType === "win" && isWin) || (streakType === "loss" && !isWin)) {
+      count++;
+    } else {
+      break;
+    }
+  }
+
+  return { count, type: streakType };
+}
+
+export function getMaxDrawdown(trades: StoredTrade[]): { maxDrawdown: number; currentDrawdown: number } {
+  const series = getCumulativePnlSeries(trades);
+
+  if (series.length === 0) {
+    return { maxDrawdown: 0, currentDrawdown: 0 };
+  }
+
+  let peak = 0;
+  let maxDrawdown = 0;
+
+  for (const point of series) {
+    if (point.cumulativePnl > peak) {
+      peak = point.cumulativePnl;
+    }
+    const drawdown = peak - point.cumulativePnl;
+    if (drawdown > maxDrawdown) {
+      maxDrawdown = drawdown;
+    }
+  }
+
+  const currentValue = series[series.length - 1].cumulativePnl;
+  const currentDrawdown = Math.max(0, peak - currentValue);
+
+  return { maxDrawdown, currentDrawdown };
+}
