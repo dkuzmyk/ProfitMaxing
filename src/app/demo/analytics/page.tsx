@@ -3,6 +3,7 @@ import Link from "next/link";
 import { DashboardRangePicker } from "@/components/dashboard-range-picker";
 import { PnlDistributionChart } from "@/components/pnl-distribution";
 import { TimeHeatmap } from "@/components/time-heatmap";
+import { WeekdayChart } from "@/components/weekday-chart";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import { getDemoInsightTrades } from "@/lib/demo-insights";
 import { formatCurrency, formatPercent } from "@/lib/demo-data";
@@ -18,6 +19,7 @@ import {
   getSymbolPerformance,
   getTagPerformance,
   getTimeHeatmap,
+  getWeekdayPerformance,
 } from "@/lib/journal-insights";
 import { getTradeRangeLabel, normalizeTradeRange } from "@/lib/trade-metrics";
 
@@ -89,62 +91,11 @@ export default async function DemoAnalyticsPage({
   const directionPerformance = getDirectionPerformance(trades);
   const holdingTime = getHoldingTimeBuckets(trades);
   const heatmapData = getTimeHeatmap(trades);
+  const weekdayData = getWeekdayPerformance(trades);
 
   const maxSetupPnl = Math.max(...setupPerformance.map((s) => Math.abs(s.totalPnl)), 1);
   const maxSymPnl = Math.max(...symbolPerformance.map((s) => Math.abs(s.totalPnl)), 1);
   const maxTagPnl = Math.max(...tagPerformance.map((t) => Math.abs(t.totalPnl)), 1);
-
-  const edgeRows: { label: string; value: string; cls: string }[] = [
-    {
-      label: "Profit Factor",
-      value:
-        profitFactor.grossLoss > 0
-          ? profitFactor.profitFactor.toFixed(2)
-          : profitFactor.grossProfit > 0
-            ? "∞"
-            : "--",
-      cls:
-        profitFactor.profitFactor >= 1.5
-          ? "text-emerald-400"
-          : profitFactor.profitFactor >= 1
-            ? "text-[#b5bac1]"
-            : "text-rose-400",
-    },
-    {
-      label: "W / L Ratio",
-      value: profitFactor.avgLoss > 0 ? `${profitFactor.winLossRatio.toFixed(2)}×` : "--",
-      cls: profitFactor.winLossRatio >= 1 ? "text-emerald-400" : "text-rose-400",
-    },
-    {
-      label: "Avg Win",
-      value: profitFactor.avgWin > 0 ? formatCurrency(profitFactor.avgWin) : "--",
-      cls: "text-emerald-400",
-    },
-    {
-      label: "Avg Loss",
-      value: profitFactor.avgLoss > 0 ? formatCurrency(-profitFactor.avgLoss) : "--",
-      cls: "text-rose-400",
-    },
-    {
-      label: "Peak Equity",
-      value: drawdown.peak > 0 ? formatCurrency(drawdown.peak) : "--",
-      cls: "text-white",
-    },
-    {
-      label: "Max Drawdown",
-      value:
-        drawdown.maxDrawdown > 0
-          ? `${formatCurrency(-drawdown.maxDrawdown)} (${formatPercent(drawdown.maxDrawdownPercent)})`
-          : "--",
-      cls: drawdown.maxDrawdown > 0 ? "text-rose-400" : "text-[#b5bac1]",
-    },
-    ...(profitFactor.bestTrade
-      ? [{ label: `Best (${profitFactor.bestTrade.symbol})`, value: formatCurrency(profitFactor.bestTrade.pnl), cls: "text-emerald-400" }]
-      : []),
-    ...(profitFactor.worstTrade
-      ? [{ label: `Worst (${profitFactor.worstTrade.symbol})`, value: formatCurrency(profitFactor.worstTrade.pnl), cls: "text-rose-400" }]
-      : []),
-  ];
 
   const [longDir, shortDir] = directionPerformance;
   const dirRows = [
@@ -171,28 +122,27 @@ export default async function DemoAnalyticsPage({
   ];
 
   return (
-    <main className="px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
+    <main className="px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
         <WorkspaceTabs variant="demo" />
 
-        {/* ── Header ── */}
-        <header className="flex flex-col gap-3 rounded-[28px] border border-white/8 bg-[#2b2d31] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.3)] md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-[#949ba4]">
-              Demo Analytics
-            </p>
-            <h1 className="mt-1 text-xl font-semibold tracking-tight text-white">
-              Explore setup and review analytics
-            </h1>
-            <p className="mt-0.5 text-xs text-[#b5bac1]">
-              Synthetic data only · {getTradeRangeLabel(selectedRange)}
-            </p>
+        {/* ── Header + Stats Strip ── */}
+        <section className="overflow-hidden rounded-[28px] border border-white/8 bg-[#2b2d31] shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
+          <div className="flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-[#949ba4]">
+                Demo Analytics
+              </p>
+              <h1 className="mt-1 text-xl font-semibold tracking-tight text-white">
+                Explore setup and review analytics
+              </h1>
+              <p className="mt-0.5 text-xs text-[#b5bac1]">
+                Synthetic data only · {getTradeRangeLabel(selectedRange)}
+              </p>
+            </div>
+            <DashboardRangePicker options={rangeOptions} selectedRange={selectedRange} />
           </div>
-          <DashboardRangePicker options={rangeOptions} selectedRange={selectedRange} />
-        </header>
-
-        {/* ── Stats Strip ── */}
-        <section className="overflow-hidden rounded-[28px] border border-white/8 bg-[#2b2d31]">
+          <div className="border-t border-white/8" />
           <div className="flex overflow-x-auto divide-x divide-white/8">
             {[
               { label: "Total P&L", value: formatCurrency(totalPnl), cls: pnlColor(totalPnl) },
@@ -291,29 +241,85 @@ export default async function DemoAnalyticsPage({
           </div>
         </section>
 
-        {/* ── P&L Distribution ── */}
-        <section className="rounded-[28px] border border-white/8 bg-[#2b2d31] px-5 pb-5 pt-4">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
-              P&amp;L Distribution
-            </p>
-            <p className="text-[11px] text-[#6d7278]">{closedTrades.length} closed trades</p>
+        {/* ── Row A: P&L Distribution + Edge & Risk ── */}
+        <section className="grid gap-4 xl:grid-cols-[1.45fr_1fr]">
+          <div className="flex flex-col rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">P&amp;L Distribution</p>
+              <p className="text-[11px] text-[#6d7278]">{closedTrades.length} closed trades</p>
+            </div>
+            <PnlDistributionChart values={closedPnls} className="flex-1 min-h-0" />
           </div>
-          <div className="mt-3">
-            <PnlDistributionChart values={closedPnls} />
+
+          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
+            <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">Edge &amp; Risk</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-[18px] bg-[#1e1f22] p-3.5">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-[#6d7278]">Profit Factor</p>
+                <p className={`mt-2 text-2xl font-semibold tabular-nums ${profitFactor.profitFactor >= 1.5 ? "text-emerald-400" : profitFactor.profitFactor >= 1 ? "text-[#b5bac1]" : "text-rose-400"}`}>
+                  {profitFactor.grossLoss > 0 ? profitFactor.profitFactor.toFixed(2) : profitFactor.grossProfit > 0 ? "∞" : "--"}
+                </p>
+              </div>
+              <div className="rounded-[18px] bg-[#1e1f22] p-3.5">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-[#6d7278]">W / L Ratio</p>
+                <p className={`mt-2 text-2xl font-semibold tabular-nums ${profitFactor.winLossRatio >= 1 ? "text-emerald-400" : "text-rose-400"}`}>
+                  {profitFactor.avgLoss > 0 ? `${profitFactor.winLossRatio.toFixed(2)}×` : "--"}
+                </p>
+              </div>
+              <div className="rounded-[18px] bg-[#1e1f22] p-3.5">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-[#6d7278]">Avg Win</p>
+                <p className="mt-2 text-xl font-semibold tabular-nums text-emerald-400">
+                  {profitFactor.avgWin > 0 ? formatCurrency(profitFactor.avgWin) : "--"}
+                </p>
+              </div>
+              <div className="rounded-[18px] bg-[#1e1f22] p-3.5">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-[#6d7278]">Avg Loss</p>
+                <p className="mt-2 text-xl font-semibold tabular-nums text-rose-400">
+                  {profitFactor.avgLoss > 0 ? formatCurrency(-profitFactor.avgLoss) : "--"}
+                </p>
+              </div>
+            </div>
+            <div className="mt-2 flex items-center justify-between rounded-[18px] bg-[#1e1f22] px-4 py-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.18em] text-[#6d7278]">Peak Equity</p>
+                <p className="mt-1.5 text-sm font-semibold text-white">{drawdown.peak > 0 ? formatCurrency(drawdown.peak) : "--"}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-[#6d7278]">Max Drawdown</p>
+                <p className={`mt-1.5 text-sm font-semibold ${drawdown.maxDrawdown > 0 ? "text-rose-400" : "text-[#b5bac1]"}`}>
+                  {drawdown.maxDrawdown > 0 ? `${formatCurrency(-drawdown.maxDrawdown)} (${formatPercent(drawdown.maxDrawdownPercent)})` : "--"}
+                </p>
+              </div>
+            </div>
+            {(profitFactor.bestTrade || profitFactor.worstTrade) && (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {profitFactor.bestTrade && (
+                  <div className="rounded-[18px] bg-[#1e1f22] p-3">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-[#6d7278]">Best Trade</p>
+                    <p className="mt-1.5 text-xs font-medium text-white">{profitFactor.bestTrade.symbol}</p>
+                    <p className="text-sm font-semibold tabular-nums text-emerald-400">{formatCurrency(profitFactor.bestTrade.pnl)}</p>
+                  </div>
+                )}
+                {profitFactor.worstTrade && (
+                  <div className="rounded-[18px] bg-[#1e1f22] p-3">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-[#6d7278]">Worst Trade</p>
+                    <p className="mt-1.5 text-xs font-medium text-white">{profitFactor.worstTrade.symbol}</p>
+                    <p className="text-sm font-semibold tabular-nums text-rose-400">{formatCurrency(profitFactor.worstTrade.pnl)}</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </section>
 
-        {/* ── Setup + Edge/Risk panel ── */}
-        <section className="grid gap-3 xl:grid-cols-[1.35fr_0.65fr]">
+        {/* ── Row B: Setup Ranking + Long/Short + Mistakes ── */}
+        <section className="grid gap-4 xl:grid-cols-[1.45fr_1fr]">
           <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
-            <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
-              Setup Ranking
-            </p>
+            <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">Setup Ranking</p>
             <div className="overflow-hidden rounded-[20px] border border-white/8">
-              <div className="overflow-x-auto">
+              <div className="max-h-[320px] overflow-auto">
                 <table className="min-w-full divide-y divide-white/8">
-                  <thead className="bg-[#1e1f22] text-left text-[10px] uppercase tracking-[0.16em] text-[#949ba4]">
+                  <thead className="sticky top-0 z-10 bg-[#1e1f22] text-left text-[10px] uppercase tracking-[0.16em] text-[#949ba4]">
                     <tr>
                       <th className="px-3 py-2">Setup</th>
                       <th className="px-3 py-2">#</th>
@@ -325,33 +331,19 @@ export default async function DemoAnalyticsPage({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/6 text-[12px]">
-                    {setupPerformance.slice(0, 10).map((setup) => (
+                    {setupPerformance.map((setup) => (
                       <tr key={setup.setup} className="transition hover:bg-white/[0.02]">
                         <td className="px-3 py-2 font-medium text-white">{setup.setup}</td>
                         <td className="px-3 py-2 text-[#b5bac1]">{setup.totalTrades}</td>
-                        <td className={`px-3 py-2 font-medium ${winRateColor(setup.winRate)}`}>
-                          {formatPercent(setup.winRate)}
-                        </td>
-                        <td className={`px-3 py-2 font-medium ${pnlColor(setup.totalPnl)}`}>
-                          {formatCurrency(setup.totalPnl)}
-                        </td>
-                        <td className="w-[72px] px-3 py-2">
-                          <InlineBar value={setup.totalPnl} maxAbs={maxSetupPnl} />
-                        </td>
-                        <td className={`px-3 py-2 ${pnlColor(setup.avgPnl)}`}>
-                          {formatCurrency(setup.avgPnl)}
-                        </td>
-                        <td className={`px-3 py-2 ${pnlColor(setup.returnPercent)}`}>
-                          {formatPercent(setup.returnPercent)}
-                        </td>
+                        <td className={`px-3 py-2 font-medium ${winRateColor(setup.winRate)}`}>{formatPercent(setup.winRate)}</td>
+                        <td className={`px-3 py-2 font-medium ${pnlColor(setup.totalPnl)}`}>{formatCurrency(setup.totalPnl)}</td>
+                        <td className="w-[72px] px-3 py-2"><InlineBar value={setup.totalPnl} maxAbs={maxSetupPnl} /></td>
+                        <td className={`px-3 py-2 ${pnlColor(setup.avgPnl)}`}>{formatCurrency(setup.avgPnl)}</td>
+                        <td className={`px-3 py-2 ${pnlColor(setup.returnPercent)}`}>{formatPercent(setup.returnPercent)}</td>
                       </tr>
                     ))}
                     {setupPerformance.length === 0 && (
-                      <tr>
-                        <td colSpan={7} className="px-3 py-4 text-[12px] text-[#b5bac1]">
-                          No setup data in this range yet.
-                        </td>
-                      </tr>
+                      <tr><td colSpan={7} className="px-3 py-4 text-[12px] text-[#b5bac1]">No setup data in this range yet.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -359,42 +351,42 @@ export default async function DemoAnalyticsPage({
             </div>
           </div>
 
-          {/* Edge/Risk + Mistake Cost */}
-          <div className="flex flex-col gap-3">
-            <div className="rounded-[24px] border border-white/8 bg-[#2b2d31] p-4">
-              <p className="mb-2.5 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
-                Edge &amp; Risk
-              </p>
-              <dl className="overflow-hidden rounded-[16px] bg-[#1e1f22] divide-y divide-white/6">
-                {edgeRows.map(({ label, value, cls }) => (
-                  <div key={label} className="flex items-center justify-between px-4 py-2">
-                    <dt className="text-[11px] text-[#6d7278]">{label}</dt>
-                    <dd className={`text-[12px] font-medium tabular-nums ${cls}`}>{value}</dd>
-                  </div>
-                ))}
-              </dl>
+          <div className="flex flex-col gap-4">
+            <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
+              <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">Long vs Short</p>
+              <div className="overflow-hidden rounded-[20px] border border-white/8">
+                <table className="min-w-full divide-y divide-white/8 text-[12px]">
+                  <thead className="bg-[#1e1f22] text-[10px] uppercase tracking-[0.16em]">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-[#949ba4]"></th>
+                      <th className="px-3 py-2 text-right font-medium text-emerald-400/80">Long</th>
+                      <th className="px-3 py-2 text-right font-medium text-rose-400/80">Short</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/6">
+                    {dirRows.map(({ label, long, short }) => (
+                      <tr key={label} className="transition hover:bg-white/[0.02]">
+                        <td className="px-3 py-2 text-[11px] text-[#6d7278]">{label}</td>
+                        <td className={`px-3 py-2 text-right font-medium tabular-nums ${long.cls}`}>{long.v}</td>
+                        <td className={`px-3 py-2 text-right font-medium tabular-nums ${short.cls}`}>{short.v}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {mistakePerformance.length > 0 && (
-              <div className="rounded-[24px] border border-white/8 bg-[#2b2d31] p-4">
-                <p className="mb-2.5 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
-                  Mistake Cost
-                </p>
-                <div className="space-y-1">
+              <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
+                <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">Mistake Cost</p>
+                <div className="space-y-1.5">
                   {mistakePerformance.slice(0, 5).map((m) => (
-                    <div
-                      key={m.label}
-                      className="flex items-center justify-between rounded-xl bg-[#1e1f22] px-3 py-2"
-                    >
+                    <div key={m.label} className="flex items-center justify-between rounded-[16px] bg-[#1e1f22] px-3 py-2.5">
                       <div className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-[12px] font-medium text-white">
-                          {m.label}
-                        </span>
+                        <span className="truncate text-[12px] font-medium text-white">{m.label}</span>
                         <span className="shrink-0 text-[10px] text-[#6d7278]">{m.count}×</span>
                       </div>
-                      <span className="shrink-0 text-[12px] font-medium tabular-nums text-rose-400">
-                        {formatCurrency(m.totalPnl)}
-                      </span>
+                      <span className="shrink-0 text-[12px] font-semibold tabular-nums text-rose-400">{formatCurrency(m.totalPnl)}</span>
                     </div>
                   ))}
                 </div>
@@ -406,13 +398,11 @@ export default async function DemoAnalyticsPage({
         {/* ── Symbol Performance ── */}
         {symbolPerformance.length > 0 && (
           <section className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
-            <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
-              Symbol Performance
-            </p>
+            <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">Symbol Performance</p>
             <div className="overflow-hidden rounded-[20px] border border-white/8">
-              <div className="overflow-x-auto">
+              <div className="max-h-[360px] overflow-auto">
                 <table className="min-w-full divide-y divide-white/8">
-                  <thead className="bg-[#1e1f22] text-left text-[10px] uppercase tracking-[0.16em] text-[#949ba4]">
+                  <thead className="sticky top-0 z-10 bg-[#1e1f22] text-left text-[10px] uppercase tracking-[0.16em] text-[#949ba4]">
                     <tr>
                       <th className="px-3 py-2">Symbol</th>
                       <th className="px-3 py-2">#</th>
@@ -425,28 +415,16 @@ export default async function DemoAnalyticsPage({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/6 text-[12px]">
-                    {symbolPerformance.slice(0, 12).map((sym) => (
+                    {symbolPerformance.map((sym) => (
                       <tr key={sym.symbol} className="transition hover:bg-white/[0.02]">
                         <td className="px-3 py-2 font-medium text-white">{sym.symbol}</td>
                         <td className="px-3 py-2 text-[#b5bac1]">{sym.totalTrades}</td>
                         <td className="px-3 py-2 text-[#b5bac1]">{sym.closedTrades}</td>
-                        <td className={`px-3 py-2 font-medium ${winRateColor(sym.winRate)}`}>
-                          {sym.closedTrades ? formatPercent(sym.winRate) : "--"}
-                        </td>
-                        <td className={`px-3 py-2 font-medium ${pnlColor(sym.totalPnl)}`}>
-                          {sym.closedTrades ? formatCurrency(sym.totalPnl) : "--"}
-                        </td>
-                        <td className="w-[72px] px-3 py-2">
-                          {sym.closedTrades ? (
-                            <InlineBar value={sym.totalPnl} maxAbs={maxSymPnl} />
-                          ) : null}
-                        </td>
-                        <td className={`px-3 py-2 ${pnlColor(sym.avgPnl)}`}>
-                          {sym.closedTrades ? formatCurrency(sym.avgPnl) : "--"}
-                        </td>
-                        <td className={`px-3 py-2 ${pnlColor(sym.returnPercent)}`}>
-                          {sym.closedTrades ? formatPercent(sym.returnPercent) : "--"}
-                        </td>
+                        <td className={`px-3 py-2 font-medium ${winRateColor(sym.winRate)}`}>{sym.closedTrades ? formatPercent(sym.winRate) : "--"}</td>
+                        <td className={`px-3 py-2 font-medium ${pnlColor(sym.totalPnl)}`}>{sym.closedTrades ? formatCurrency(sym.totalPnl) : "--"}</td>
+                        <td className="w-[72px] px-3 py-2">{sym.closedTrades ? <InlineBar value={sym.totalPnl} maxAbs={maxSymPnl} /> : null}</td>
+                        <td className={`px-3 py-2 ${pnlColor(sym.avgPnl)}`}>{sym.closedTrades ? formatCurrency(sym.avgPnl) : "--"}</td>
+                        <td className={`px-3 py-2 ${pnlColor(sym.returnPercent)}`}>{sym.closedTrades ? formatPercent(sym.returnPercent) : "--"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -456,61 +434,10 @@ export default async function DemoAnalyticsPage({
           </section>
         )}
 
-        {/* ── Tag + Grade/Direction ── */}
-        <section className={`grid gap-3 ${tagPerformance.length > 0 ? "xl:grid-cols-[1.1fr_0.9fr]" : ""}`}>
-          {tagPerformance.length > 0 && (
-            <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
-              <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
-                Tag Performance
-              </p>
-              <div className="overflow-hidden rounded-[20px] border border-white/8">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-white/8">
-                    <thead className="bg-[#1e1f22] text-left text-[10px] uppercase tracking-[0.16em] text-[#949ba4]">
-                      <tr>
-                        <th className="px-3 py-2">Tag</th>
-                        <th className="px-3 py-2">#</th>
-                        <th className="px-3 py-2">Cl</th>
-                        <th className="px-3 py-2">Win%</th>
-                        <th className="px-3 py-2">P&amp;L</th>
-                        <th className="w-[72px] px-3 py-2"></th>
-                        <th className="px-3 py-2">Avg</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/6 text-[12px]">
-                      {tagPerformance.slice(0, 12).map((row) => (
-                        <tr key={row.tag} className="transition hover:bg-white/[0.02]">
-                          <td className="px-3 py-2 font-medium text-white">{row.tag}</td>
-                          <td className="px-3 py-2 text-[#b5bac1]">{row.totalTrades}</td>
-                          <td className="px-3 py-2 text-[#b5bac1]">{row.closedTrades}</td>
-                          <td className={`px-3 py-2 font-medium ${winRateColor(row.winRate)}`}>
-                            {row.closedTrades ? formatPercent(row.winRate) : "--"}
-                          </td>
-                          <td className={`px-3 py-2 font-medium ${pnlColor(row.totalPnl)}`}>
-                            {row.closedTrades ? formatCurrency(row.totalPnl) : "--"}
-                          </td>
-                          <td className="w-[72px] px-3 py-2">
-                            {row.closedTrades ? (
-                              <InlineBar value={row.totalPnl} maxAbs={maxTagPnl} />
-                            ) : null}
-                          </td>
-                          <td className={`px-3 py-2 ${pnlColor(row.avgPnl)}`}>
-                            {row.closedTrades ? formatCurrency(row.avgPnl) : "--"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Grade + Long/Short merged */}
+        {/* ── Grade + Tag Performance ── */}
+        <section className={`grid gap-4 ${tagPerformance.length > 0 ? "xl:grid-cols-[1fr_1.2fr]" : ""}`}>
           <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
-            <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
-              Grade Performance
-            </p>
+            <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">Grade Performance</p>
             <div className="overflow-hidden rounded-[20px] border border-white/8">
               <table className="min-w-full divide-y divide-white/8">
                 <thead className="bg-[#1e1f22] text-left text-[10px] uppercase tracking-[0.16em] text-[#949ba4]">
@@ -528,74 +455,72 @@ export default async function DemoAnalyticsPage({
                     <tr key={g.grade} className="transition hover:bg-white/[0.02]">
                       <td className="px-3 py-2 font-semibold text-white">{g.grade}</td>
                       <td className="px-3 py-2 text-[#b5bac1]">{g.count}</td>
-                      <td className="px-3 py-2 text-[#b5bac1]">
-                        {g.avgConfidence ? g.avgConfidence.toFixed(1) : "--"}
-                      </td>
-                      <td className={`px-3 py-2 font-medium ${pnlColor(g.totalPnl)}`}>
-                        {formatCurrency(g.totalPnl)}
-                      </td>
-                      <td className={`px-3 py-2 ${pnlColor(g.avgPnl)}`}>
-                        {formatCurrency(g.avgPnl)}
-                      </td>
-                      <td className={`px-3 py-2 ${pnlColor(g.returnPercent)}`}>
-                        {formatPercent(g.returnPercent)}
-                      </td>
+                      <td className="px-3 py-2 text-[#b5bac1]">{g.avgConfidence ? g.avgConfidence.toFixed(1) : "--"}</td>
+                      <td className={`px-3 py-2 font-medium ${pnlColor(g.totalPnl)}`}>{formatCurrency(g.totalPnl)}</td>
+                      <td className={`px-3 py-2 ${pnlColor(g.avgPnl)}`}>{formatCurrency(g.avgPnl)}</td>
+                      <td className={`px-3 py-2 ${pnlColor(g.returnPercent)}`}>{formatPercent(g.returnPercent)}</td>
                     </tr>
                   ))}
                   {gradePerformance.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-3 py-3 text-[12px] text-[#b5bac1]">
-                        No graded trades yet.
-                      </td>
-                    </tr>
+                    <tr><td colSpan={6} className="px-3 py-3 text-[12px] text-[#b5bac1]">No graded trades yet.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
+          </div>
 
-            <div className="mt-4 border-t border-white/8 pt-4">
-              <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
-                Long vs Short
-              </p>
+          {tagPerformance.length > 0 && (
+            <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
+              <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">Tag Performance</p>
               <div className="overflow-hidden rounded-[20px] border border-white/8">
-                <table className="min-w-full divide-y divide-white/8 text-[12px]">
-                  <thead className="bg-[#1e1f22] text-[10px] uppercase tracking-[0.16em]">
-                    <tr>
-                      <th className="px-3 py-2 text-left text-[#949ba4]"></th>
-                      <th className="px-3 py-2 text-right font-medium text-emerald-400/80">Long</th>
-                      <th className="px-3 py-2 text-right font-medium text-rose-400/80">Short</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/6">
-                    {dirRows.map(({ label, long, short }) => (
-                      <tr key={label} className="transition hover:bg-white/[0.02]">
-                        <td className="px-3 py-2 text-[11px] text-[#6d7278]">{label}</td>
-                        <td className={`px-3 py-2 text-right font-medium tabular-nums ${long.cls}`}>
-                          {long.v}
-                        </td>
-                        <td className={`px-3 py-2 text-right font-medium tabular-nums ${short.cls}`}>
-                          {short.v}
-                        </td>
+                <div className="max-h-[320px] overflow-auto">
+                  <table className="min-w-full divide-y divide-white/8">
+                    <thead className="sticky top-0 z-10 bg-[#1e1f22] text-left text-[10px] uppercase tracking-[0.16em] text-[#949ba4]">
+                      <tr>
+                        <th className="px-3 py-2">Tag</th>
+                        <th className="px-3 py-2">#</th>
+                        <th className="px-3 py-2">Cl</th>
+                        <th className="px-3 py-2">Win%</th>
+                        <th className="px-3 py-2">P&amp;L</th>
+                        <th className="w-[72px] px-3 py-2"></th>
+                        <th className="px-3 py-2">Avg</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-white/6 text-[12px]">
+                      {tagPerformance.map((row) => (
+                        <tr key={row.tag} className="transition hover:bg-white/[0.02]">
+                          <td className="px-3 py-2 font-medium text-white">{row.tag}</td>
+                          <td className="px-3 py-2 text-[#b5bac1]">{row.totalTrades}</td>
+                          <td className="px-3 py-2 text-[#b5bac1]">{row.closedTrades}</td>
+                          <td className={`px-3 py-2 font-medium ${winRateColor(row.winRate)}`}>{row.closedTrades ? formatPercent(row.winRate) : "--"}</td>
+                          <td className={`px-3 py-2 font-medium ${pnlColor(row.totalPnl)}`}>{row.closedTrades ? formatCurrency(row.totalPnl) : "--"}</td>
+                          <td className="w-[72px] px-3 py-2">{row.closedTrades ? <InlineBar value={row.totalPnl} maxAbs={maxTagPnl} /> : null}</td>
+                          <td className={`px-3 py-2 ${pnlColor(row.avgPnl)}`}>{row.closedTrades ? formatCurrency(row.avgPnl) : "--"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </section>
 
-        {/* ── Holding Time + Time Heatmap ── */}
-        <section className="grid gap-3 xl:grid-cols-[0.85fr_1.15fr]">
+        {/* ── Weekday Performance + Holding Time ── */}
+        <section className="grid gap-4 xl:grid-cols-2">
           <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
-                Holding Time
-              </p>
+              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">Performance by Weekday</p>
+              <p className="text-[11px] text-[#6d7278]">total P&amp;L · close date</p>
+            </div>
+            <WeekdayChart data={weekdayData} />
+          </div>
+
+          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">Holding Time</p>
               {holdingTime.avgHoldMinutes > 0 && (
-                <p className="text-[11px] text-[#6d7278]">
-                  avg {formatHoldTime(holdingTime.avgHoldMinutes)}
-                </p>
+                <p className="text-[11px] text-[#6d7278]">avg {formatHoldTime(holdingTime.avgHoldMinutes)}</p>
               )}
             </div>
             <div className="overflow-hidden rounded-[20px] border border-white/8">
@@ -614,38 +539,27 @@ export default async function DemoAnalyticsPage({
                     <tr key={b.label} className="transition hover:bg-white/[0.02]">
                       <td className="px-3 py-2 font-medium text-white">{b.label}</td>
                       <td className="px-3 py-2 text-[#b5bac1]">{b.count}</td>
-                      <td className={`px-3 py-2 font-medium ${winRateColor(b.winRate)}`}>
-                        {formatPercent(b.winRate)}
-                      </td>
-                      <td className={`px-3 py-2 font-medium ${pnlColor(b.totalPnl)}`}>
-                        {formatCurrency(b.totalPnl)}
-                      </td>
-                      <td className={`px-3 py-2 ${pnlColor(b.avgPnl)}`}>
-                        {formatCurrency(b.avgPnl)}
-                      </td>
+                      <td className={`px-3 py-2 font-medium ${winRateColor(b.winRate)}`}>{formatPercent(b.winRate)}</td>
+                      <td className={`px-3 py-2 font-medium ${pnlColor(b.totalPnl)}`}>{formatCurrency(b.totalPnl)}</td>
+                      <td className={`px-3 py-2 ${pnlColor(b.avgPnl)}`}>{formatCurrency(b.avgPnl)}</td>
                     </tr>
                   ))}
                   {holdingTime.buckets.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-3 py-4 text-[12px] text-[#b5bac1]">
-                        No closed trades yet.
-                      </td>
-                    </tr>
+                    <tr><td colSpan={5} className="px-3 py-4 text-[12px] text-[#b5bac1]">No closed trades yet.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
           </div>
+        </section>
 
-          <div className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">
-                Time of Day
-              </p>
-              <p className="text-[11px] text-[#6d7278]">avg P&amp;L by open hour</p>
-            </div>
-            <TimeHeatmap data={heatmapData} />
+        {/* ── Time Heatmap (full width) ── */}
+        <section className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#949ba4]">Time of Day</p>
+            <p className="text-[11px] text-[#6d7278]">avg P&amp;L by open hour</p>
           </div>
+          <TimeHeatmap data={heatmapData} />
         </section>
       </div>
     </main>

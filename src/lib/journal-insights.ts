@@ -613,4 +613,41 @@ export function getTimeHeatmap(trades: InsightTrade[]) {
   }));
 }
 
+export function getWeekdayPerformance(trades: InsightTrade[]) {
+  // Ordered Mon → Sun for display
+  const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+  const DAY_LABELS: Record<number, string> = {
+    0: "Sun", 1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat",
+  };
+
+  const buckets = new Map(
+    [0, 1, 2, 3, 4, 5, 6].map((d) => [
+      d,
+      { day: d, dayLabel: DAY_LABELS[d], totalPnl: 0, totalTrades: 0, closedTrades: 0, wins: 0 },
+    ]),
+  );
+
+  for (const trade of trades) {
+    // Use close date for P&L realisation; fall back to open date for trade count
+    const dateStr = trade.closedAt ?? trade.openedAt;
+    const day = new Date(dateStr).getDay();
+    const bucket = buckets.get(day)!;
+    bucket.totalTrades++;
+    if (trade.closedAt) {
+      bucket.closedTrades++;
+      bucket.totalPnl += trade.realizedPnl;
+      if (trade.realizedPnl > 0) bucket.wins++;
+    }
+  }
+
+  return DAY_ORDER.map((d) => {
+    const b = buckets.get(d)!;
+    return {
+      ...b,
+      avgPnl: b.closedTrades > 0 ? b.totalPnl / b.closedTrades : 0,
+      winRate: b.closedTrades > 0 ? b.wins / b.closedTrades : 0,
+    };
+  });
+}
+
 export type { InsightTrade };

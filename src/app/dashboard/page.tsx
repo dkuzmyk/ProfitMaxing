@@ -157,35 +157,13 @@ export default async function DashboardPage({
           </div>
         ) : null}
 
-        {/* Action bar */}
-        <section className="flex flex-wrap items-center gap-3">
-          <Link
-            href="/trades/new"
-            className="rounded-[20px] bg-[#5865f2] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#4752c4] transition"
-          >
-            + Add Trade
-          </Link>
-          <Link
-            href="/trades/import"
-            className="rounded-[20px] border border-white/10 bg-[#1e1f22] px-5 py-2.5 text-sm font-medium text-[#dbdee1] hover:border-[#5865f2]/40 transition"
-          >
-            ↑ CSV Import
-          </Link>
-          <span className="rounded-[20px] border border-white/6 bg-transparent px-4 py-2.5 text-sm text-[#4a4d52] cursor-default">
-            Webull sync · soon
-          </span>
-          <span className="rounded-[20px] border border-white/6 bg-transparent px-4 py-2.5 text-sm text-[#4a4d52] cursor-default">
-            Broker sync · soon
-          </span>
-        </section>
-
         {/* Today's Session */}
-        <section className="rounded-[28px] border border-white/8 bg-[#2b2d31] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
-          <div className="flex items-center justify-between mb-4">
+        <section className="overflow-hidden rounded-[28px] border border-white/8 bg-[#2b2d31] shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
+          <div className="flex items-center justify-between p-5 pb-4">
             <p className="text-xs uppercase tracking-widest text-[#949ba4]">Today&apos;s Session</p>
             <p className="text-xs text-[#6d7278]">{formatTodayLabel()}</p>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 px-5 pb-5 sm:grid-cols-4">
             {/* Today P&L */}
             <div className="rounded-[22px] bg-[#1e1f22] p-4">
               <p className="text-[10px] uppercase tracking-wider text-[#6d7278]">P&amp;L Today</p>
@@ -256,6 +234,42 @@ export default async function DashboardPage({
                   ? `${formatCurrency(metrics.totalCurrentlyInvested)} deployed`
                   : "all flat"}
               </p>
+            </div>
+          </div>
+
+          {/* Quick actions */}
+          <div className="flex flex-wrap items-center gap-2 border-t border-white/8 px-5 py-3">
+            <Link
+              href="/trades/new"
+              className="flex items-center gap-1.5 rounded-[18px] bg-[#5865f2] px-3.5 py-1.5 text-[13px] font-medium text-white transition hover:bg-[#4752c4]"
+            >
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+              </svg>
+              Add Trade
+            </Link>
+            <Link
+              href="/trades/import"
+              className="flex items-center gap-1.5 rounded-[18px] border border-white/10 bg-[#1e1f22] px-3.5 py-1.5 text-[13px] font-medium text-[#dbdee1] transition hover:border-[#5865f2]/40 hover:text-white"
+            >
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                <path d="M6.5 1v7.5M4 6l2.5 2.5L9 6M2 11h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Import CSV
+            </Link>
+            <div className="ml-auto flex items-center gap-4">
+              <span className="flex items-center gap-1.5 text-[11px] text-[#353840]">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                  <path d="M1 4c1.4-1.4 3-2.2 5-2.2s3.6.8 5 2.2M3.5 6.5C4.2 5.8 5 5.5 6 5.5s1.8.3 2.5 1M6 9h.01" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Webull · soon
+              </span>
+              <span className="flex items-center gap-1.5 text-[11px] text-[#353840]">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                  <path d="M4.5 4.5l3 3M7.5 2l2.5 2.5-1.5 1.5L6 3.5 7.5 2zM2 7.5l2.5 2.5-1.5 1.5L.5 9 2 7.5z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Broker · soon
+              </span>
             </div>
           </div>
         </section>

@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 type PnlDistributionProps = {
   /** Realized P&L for every closed trade in the selected range */
   values: number[];
+  /** Optional className applied to the outermost wrapper div */
+  className?: string;
 };
 
 type HoverState = {
@@ -35,7 +37,7 @@ function fmtCurrency(v: number) {
   }).format(v);
 }
 
-export function PnlDistributionChart({ values }: PnlDistributionProps) {
+export function PnlDistributionChart({ values, className }: PnlDistributionProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [hovered, setHovered] = useState<HoverState | null>(null);
@@ -53,7 +55,7 @@ export function PnlDistributionChart({ values }: PnlDistributionProps) {
 
   if (values.length === 0) {
     return (
-      <div className="flex h-48 items-center justify-center rounded-[24px] border border-white/8 bg-[#1e1f22] text-sm text-[#949ba4]">
+      <div className={`flex min-h-[180px] items-center justify-center rounded-[24px] border border-white/8 bg-[#1e1f22] text-sm text-[#949ba4] ${className ?? ""}`}>
         No closed trades in this range yet.
       </div>
     );
@@ -122,11 +124,11 @@ export function PnlDistributionChart({ values }: PnlDistributionProps) {
   const hb = hovered !== null ? buckets[hovered.bucketIdx] : null;
 
   return (
-    <div ref={containerRef} className="relative rounded-[24px] border border-white/8 bg-[#1e1f22] p-4 sm:p-5">
+    <div ref={containerRef} className={`relative rounded-[24px] border border-white/8 bg-[#1e1f22] p-4 sm:p-5 ${className ?? ""}`}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${w} ${h}`}
-        className="h-48 w-full"
+        className="h-full w-full min-h-[180px]"
         role="img"
         aria-label="P&amp;L distribution histogram"
         onMouseMove={handleMouseMove}
