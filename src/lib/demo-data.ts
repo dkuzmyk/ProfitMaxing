@@ -194,7 +194,7 @@ function buildDemoTrades() {
     const openedAt = setLocalTime(tradingDate, timeSlot.hour, timeSlot.minute);
     const holdMinutes = 18 + (index % 6) * 11 + (index % 4) * 7;
     const closedAt = new Date(openedAt.getTime() + holdMinutes * 60000);
-    const direction =
+    const direction: DemoTradeDirection =
       setup.defaultDirection === "Short" && index % 5 !== 0
         ? "Short"
         : index % 11 === 0
