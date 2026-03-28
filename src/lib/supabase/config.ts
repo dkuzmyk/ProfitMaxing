@@ -8,6 +8,14 @@ function readEnv(name: string) {
   return value;
 }
 
+export function isSupabaseConfigured() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  return !!(url && key);
+}
+
 export function getSupabaseConfig() {
   const url = readEnv("NEXT_PUBLIC_SUPABASE_URL");
   const key =

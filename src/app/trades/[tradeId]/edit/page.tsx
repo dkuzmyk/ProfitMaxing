@@ -42,6 +42,7 @@ export default async function EditTradePage({
       "id, symbol, setup, direction, quantity, entry_price, exit_price, opened_at, closed_at, notes, thesis, lessons, tags, mistake_tags, followed_plan, confidence_rating, grade",
     )
     .eq("id", tradeId)
+    .eq("user_id", user.id)
     .single();
 
   if (error || !trade) {

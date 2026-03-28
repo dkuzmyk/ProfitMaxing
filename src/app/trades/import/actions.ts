@@ -313,7 +313,7 @@ export async function importTrades(formData: FormData) {
     const batch = payload.slice(i, i + batchSize);
     const { error } = await supabase.from("trades").insert(batch);
     if (error) {
-      redirect(`/trades/import?error=${encodeURIComponent(error.message)}`);
+      redirect("/trades/import?error=Import+failed.+Please+try+again.");
     }
   }
 

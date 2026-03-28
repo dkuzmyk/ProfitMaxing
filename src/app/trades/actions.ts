@@ -226,7 +226,7 @@ export async function createTrade(formData: FormData) {
   });
 
   if (error) {
-    fail("new", error.message);
+    fail("new", "Unable to save this trade. Please try again.");
   }
 
   revalidateTradePages();
@@ -239,7 +239,7 @@ export async function createTrade(formData: FormData) {
 }
 
 export async function updateTrade(formData: FormData) {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const tradeId = String(formData.get("tradeId") ?? "");
 
   if (!tradeId) {
@@ -252,11 +252,12 @@ export async function updateTrade(formData: FormData) {
     .from("trades")
     .update(payload)
     .eq("id", tradeId)
+    .eq("user_id", user.id)
     .select("id")
     .single();
 
   if (error || !data) {
-    fail({ tradeId }, error?.message ?? "Unable to update this trade.");
+    fail({ tradeId }, "Unable to update this trade.");
   }
 
   revalidateTradePages();
@@ -264,7 +265,7 @@ export async function updateTrade(formData: FormData) {
 }
 
 export async function deleteTrade(formData: FormData) {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const tradeId = String(formData.get("tradeId") ?? "");
 
   if (!tradeId) {
@@ -274,10 +275,11 @@ export async function deleteTrade(formData: FormData) {
   const { error } = await supabase
     .from("trades")
     .delete()
-    .eq("id", tradeId);
+    .eq("id", tradeId)
+    .eq("user_id", user.id);
 
   if (error) {
-    redirect(`/dashboard?message=${encodeURIComponent(error.message)}`);
+    redirect("/dashboard?message=Unable+to+delete+this+trade.");
   }
 
   revalidateTradePages();

@@ -26,6 +26,7 @@ export default async function TradeDetailPage({
       "id, symbol, setup, direction, quantity, entry_price, exit_price, opened_at, closed_at, status, realized_pnl, realized_pnl_percent, entry_value, followed_plan, confidence_rating, grade, tags, mistake_tags, thesis, lessons, notes",
     )
     .eq("id", tradeId)
+    .eq("user_id", user.id)
     .single();
 
   if (error || !trade) {

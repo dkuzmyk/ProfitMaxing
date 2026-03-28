@@ -10,6 +10,7 @@ import {
 
 import { signOut } from "@/app/login/actions";
 import { createClient } from "@/lib/supabase/server";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   formatCurrency,
   formatPercent,
@@ -19,16 +20,19 @@ import {
 import { getTradeStreak } from "@/lib/trade-metrics";
 
 export default async function Home() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  let isAuthenticated = false;
+  if (isSupabaseConfigured()) {
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
 
-  const isMissingSession =
-    error?.name === "AuthSessionMissingError" ||
-    error?.message.toLowerCase().includes("session missing");
-  const isAuthenticated = !!user && !isMissingSession;
+    const isMissingSession =
+      error?.name === "AuthSessionMissingError" ||
+      error?.message.toLowerCase().includes("session missing");
+    isAuthenticated = !!user && !isMissingSession;
+  }
 
   const demoMetrics = getDemoMetrics("all");
   const allDemoTrades = getDemoTrades();
